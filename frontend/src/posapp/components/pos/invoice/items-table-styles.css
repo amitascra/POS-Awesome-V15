@@ -214,7 +214,7 @@
 	max-width: 100% !important;
 	margin: 0 !important;
 	padding: 0 !important;
-	min-height: var(--cell-height, 60px);
+	min-height: var(--cell-height, 80px);
 }
 
 .posa-cart-table tr:hover {
@@ -227,12 +227,13 @@
 
 /* Table cells */
 .posa-cart-table td {
-	padding: 14px 12px;
+	padding: 18px 14px;
 	vertical-align: middle;
-	height: 60px;
+	height: 80px;
 	text-align: center;
 	color: var(--pos-text-primary);
 	position: relative;
+	font-size: 0.95rem;
 }
 
 .posa-cart-table td > div {
@@ -245,6 +246,44 @@
 }
 
 /* =================================================================
+   ITEM NAME COLUMN - BATCH/SERIAL CHIPS
+   ================================================================= */
+
+.posa-cart-item-row .v-chip {
+	font-size: 0.8rem !important;
+	height: 24px !important;
+	padding: 0 10px !important;
+	font-weight: 500 !important;
+}
+
+.posa-cart-item-row .v-chip.v-chip--size-x-small {
+	font-size: 0.75rem !important;
+	height: 22px !important;
+	padding: 0 8px !important;
+}
+
+/* Make batch chips more prominent */
+.posa-cart-item-row .v-chip[color="info"] {
+	background-color: rgba(33, 150, 243, 0.15) !important;
+	color: rgb(13, 71, 161) !important;
+	border: 1px solid rgba(33, 150, 243, 0.3) !important;
+}
+
+/* Item name cell - allow wrapping for better visibility */
+.posa-cart-table td[data-column-key="item_name"] {
+	text-align: left !important;
+	max-width: 350px;
+	white-space: normal !important;
+	line-height: 1.4;
+}
+
+.posa-cart-table td[data-column-key="item_name"] .d-flex {
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
+}
+
+/* =================================================================
    QUANTITY COUNTER COMPONENT
    ================================================================= */
 
@@ -252,10 +291,10 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	gap: 6px;
-	padding: 4px;
-	min-width: 140px;
-	max-width: 160px;
+	gap: 8px;
+	padding: 6px;
+	min-width: 150px;
+	max-width: 180px;
 	width: auto;
 	height: auto;
 	background: var(--pos-surface-variant);
@@ -276,10 +315,10 @@
 
 .qty-control-btn,
 .posa-cart-table__qty-btn {
-	width: 24px !important;
-	height: 24px !important;
-	min-width: 24px !important;
-	border-radius: 6px !important;
+	width: 32px !important;
+	height: 32px !important;
+	min-width: 32px !important;
+	border-radius: 8px !important;
 	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 	box-shadow:
 		0 2px 8px var(--pos-shadow-light),
@@ -351,14 +390,14 @@
 }
 
 .posa-cart-table__qty-display {
-	min-width: 40px;
-	max-width: 80px;
+	min-width: 50px;
+	max-width: 90px;
 	width: auto;
 	flex: 1 1 auto;
 	text-align: center;
 	font-weight: 600;
-	padding: 0 2px;
-	border-radius: 4px;
+	padding: 0 4px;
+	border-radius: 6px;
 	background: var(--pos-primary-container);
 	border: 1px solid var(--pos-primary-variant);
 	font-family:
@@ -370,13 +409,13 @@
 		"lnum" 1,
 		"kern" 1;
 	color: var(--pos-primary);
-	font-size: 0.75rem;
+	font-size: 0.9rem;
 	transition: all 0.2s ease;
 	box-shadow: 0 1px 3px var(--pos-shadow-light);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	height: 24px;
+	height: 32px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -415,13 +454,13 @@
 }
 
 .posa-cart-table__editor-display {
-	min-width: 60px;
+	min-width: 70px;
 	max-width: 100%;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	gap: 4px;
-	padding: 4px 8px;
+	padding: 6px 10px;
 	border-radius: 6px;
 	border: 1px solid var(--pos-primary-variant);
 	/* Match Qty border strength */
@@ -432,8 +471,8 @@
 	font-weight: 500;
 	cursor: pointer;
 	transition: all 0.2s ease;
-	height: 32px;
-	font-size: 0.9rem;
+	height: 36px;
+	font-size: 0.95rem;
 }
 
 .posa-cart-table__editor-display:hover {
@@ -733,37 +772,37 @@
 
 .posa-responsive-table-container.breakpoint-xs {
 	--table-padding: 8px;
-	--header-font-size: 0.65rem;
-	--cell-padding: 8px 4px;
-	--cell-height: 48px;
+	--header-font-size: 0.7rem;
+	--cell-padding: 12px 6px;
+	--cell-height: 68px;
 }
 
 .posa-responsive-table-container.breakpoint-sm {
 	--table-padding: 12px;
-	--header-font-size: 0.7rem;
-	--cell-padding: 12px 6px;
-	--cell-height: 52px;
+	--header-font-size: 0.75rem;
+	--cell-padding: 14px 8px;
+	--cell-height: 72px;
 }
 
 .posa-responsive-table-container.breakpoint-md {
 	--table-padding: 16px;
-	--header-font-size: 0.75rem;
-	--cell-padding: 14px 8px;
-	--cell-height: 56px;
+	--header-font-size: 0.8rem;
+	--cell-padding: 16px 10px;
+	--cell-height: 76px;
 }
 
 .posa-responsive-table-container.breakpoint-lg {
 	--table-padding: 16px;
-	--header-font-size: 0.8rem;
-	--cell-padding: 16px 12px;
-	--cell-height: 60px;
+	--header-font-size: 0.85rem;
+	--cell-padding: 18px 12px;
+	--cell-height: 80px;
 }
 
 .posa-responsive-table-container.breakpoint-xl {
 	--table-padding: 20px;
-	--header-font-size: 0.85rem;
-	--cell-padding: 18px 12px;
-	--cell-height: 64px;
+	--header-font-size: 0.9rem;
+	--cell-padding: 20px 14px;
+	--cell-height: 84px;
 }
 
 /* Container-aware responsive adjustments */

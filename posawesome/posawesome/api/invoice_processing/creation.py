@@ -813,6 +813,12 @@ def update_invoice(data):
 
     _deduplicate_free_items(invoice_doc)
 
+    # Set Branch from POS Profile if not already set (for custom validations)
+    if pos_profile and not invoice_doc.get("branch"):
+        branch = frappe.db.get_value("POS Profile", pos_profile, "branch")
+        if branch:
+            invoice_doc.branch = branch
+
     # Set missing values first
     invoice_doc.set_missing_values()
     if effective_price_list:
