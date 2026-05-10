@@ -22,7 +22,7 @@
 
 			<v-img
 				:src="posLogo"
-				alt="POS Awesome"
+				alt="AscraPOS"
 				:max-width="isMobile ? 24 : 32"
 				:class="['pos-navbar-logo', isRtl ? 'rtl-logo' : 'ltr-logo']"
 				loading="lazy"
