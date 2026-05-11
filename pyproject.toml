@@ -1,7 +1,7 @@
 [project]
 name = "posawesome"
 authors = [
-    { name = "Amit Kumar", email = "amit@ascra.com"},
+    { name = "Amit Kumar", email = "amit@ascratech.com"},
     { name = "Youssef Restom", email = "youssef@totrox.com"},
     { name = "Abdul Manan", email="defendicon@github.com"},
     { name = "ASA Technologies", email = "dev@asaerp.com"},
