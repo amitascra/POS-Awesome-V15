@@ -405,7 +405,6 @@ export function useItemAddition() {
 				// Check if we should split across batches BEFORE assigning manual batch
 				// This prevents manual batch selection from blocking auto-splitting
 				// Split ONLY if: has batch, no batch assigned yet, AND auto-set enabled AND qty exceeds single batch availability
-				// OR if force_batch_allocation is set (manual split button clicked)
 				let shouldAllocateAcrossBatches = false;
 				
 				if (
@@ -419,14 +418,13 @@ export function useItemAddition() {
 					const usable_batches = batches.filter((b) => b.available_qty > 0);
 					if (usable_batches.length > 0) {
 						const first_batch_qty = usable_batches[0]?.available_qty || 0;
-						// Split if: requested qty exceeds first batch availability OR force_batch_allocation is set
-						if (requestedQtyForBatching > first_batch_qty || context.force_batch_allocation) {
+						// Split ONLY if requested qty exceeds first batch availability
+						if (requestedQtyForBatching > first_batch_qty) {
 							shouldAllocateAcrossBatches = true;
 							logBatchFlow("Auto-splitting triggered: qty exceeds single batch availability", {
 								item_code: new_item.item_code,
 								requested_qty: requestedQtyForBatching,
 								first_batch_qty: first_batch_qty,
-								forced: context.force_batch_allocation,
 							});
 						}
 					}
@@ -434,25 +432,10 @@ export function useItemAddition() {
 
 				if (shouldAllocateAcrossBatches) {
 					// Get sorted availability (taking existing cart items into account)
-					// If force_batch_allocation is set, try to use cached batch data first
-					let batches;
-					if (context.force_batch_allocation && item.batch_no_data && item.batch_no_data.length > 0) {
-						// Use cached batch data to avoid API filtering issues
-						batches = item.batch_no_data.map((b: any) => ({
-							batch_no: b.batch_no,
-							available_qty: b.available_qty ?? b.batch_qty ?? b.original_batch_qty ?? 0,
-							expiry_date: b.expiry_date,
-						}));
-						logBatchFlow("Using cached batch data for forced split", {
-							item_code: new_item.item_code,
-							cached_batches: batches.length,
-						});
-					} else {
-						batches = await getBatchAvailabilityForItem(
-							context,
-							new_item,
-						);
-					}
+					const batches = await getBatchAvailabilityForItem(
+						context,
+						new_item,
+					);
 					// Filter for usable batches
 					const usable_batches = batches.filter(
 						(b) => b.available_qty > 0,
@@ -463,6 +446,24 @@ export function useItemAddition() {
 						// Fallback to standard behavior (likely picks first or none)
 						callSetBatchQty(context, new_item, null, false);
 					} else {
+						// Calculate total available qty across all batches
+						const total_available = usable_batches.reduce(
+							(sum, b) => sum + b.available_qty,
+							0
+						);
+						
+						// Check if total available is sufficient for requested qty
+						if (new_item.qty > total_available) {
+							// Insufficient stock - don't split, use standard behavior
+							logBatchFlow("Insufficient total batch availability, skipping split", {
+								item_code: new_item.item_code,
+								requested_qty: new_item.qty,
+								total_available,
+							});
+							callSetBatchQty(context, new_item, null, false);
+							return;
+						}
+						
 						let remaining_qty = new_item.qty;
 
 						const allocations: Array<{ batch: any; qty: number }> =
