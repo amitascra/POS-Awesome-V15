@@ -432,10 +432,27 @@ export function useItemAddition() {
 
 				if (shouldAllocateAcrossBatches) {
 					// Get sorted availability (taking existing cart items into account)
-					const batches = await getBatchAvailabilityForItem(
-						context,
-						new_item,
-					);
+					// For manual split (new_line: true), use cached batch data to see all batches
+					// For auto-split (new_line: false), use API data to respect reservations
+					let batches;
+					if (context.new_line && item.batch_no_data && item.batch_no_data.length > 0) {
+						// Manual split button clicked - use cached data to see all batches
+						batches = item.batch_no_data.map((b: any) => ({
+							batch_no: b.batch_no,
+							available_qty: b.available_qty ?? b.batch_qty ?? b.original_batch_qty ?? 0,
+							expiry_date: b.expiry_date,
+						}));
+						logBatchFlow("Using cached batch data for manual split", {
+							item_code: new_item.item_code,
+							cached_batches: batches.length,
+						});
+					} else {
+						// Auto-split - use API data to respect reservations
+						batches = await getBatchAvailabilityForItem(
+							context,
+							new_item,
+						);
+					}
 					// Filter for usable batches
 					const usable_batches = batches.filter(
 						(b) => b.available_qty > 0,
