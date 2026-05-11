@@ -8,7 +8,29 @@ from frappe.utils import flt, cint
 
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
 from erpnext.stock.doctype.batch.batch import get_batch_qty
-from erpnext.stock.serial_batch_bundle import SerialBatchCreation
+from erpnext.stock.serial_batch_bundle import SerialBatchCreation as ERPNextSerialBatchCreation
+
+
+class CustomSerialBatchCreation(ERPNextSerialBatchCreation):
+	"""Custom SerialBatchCreation that skips qty validation for POS invoices.
+
+	POSAwesome handles batch allocation separately via set_batch_nos_for_bundels,
+	so we bypass ERPNext's strict bundle validation to prevent false positives.
+	"""
+
+	def validate_qty(self, doc):
+		# Skip validation for POS invoices - POSAwesome handles batch allocation separately
+		if doc.voucher_type in ["Sales Invoice", "POS Invoice"]:
+			try:
+				voucher_doc = frappe.db.get_value(doc.voucher_type, doc.voucher_no, "is_pos")
+				if voucher_doc:
+					return
+			except Exception:
+				# If we can't check is_pos, proceed with normal validation
+				pass
+
+		# Call parent validation for non-POS invoices
+		super().validate_qty(doc)
 
 
 class CustomSalesInvoice(SalesInvoice):
@@ -138,7 +160,7 @@ def get_selected_batch_qty(row):
 def make_auto_batch_bundle(doc, row, required_qty, consumed_by_batch=None):
 	"""Create Serial & Batch Bundle with auto-allocated batches."""
 	batches = get_batch_allocations(row, required_qty, consumed_by_batch=consumed_by_batch)
-	bundle = SerialBatchCreation(
+	bundle = CustomSerialBatchCreation(
 		{
 			"item_code": row.item_code,
 			"warehouse": row.warehouse,
