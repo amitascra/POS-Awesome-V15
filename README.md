@@ -1,34 +1,47 @@
 <div align="center">
     <img src="https://frappecloud.com/files/pos.png" height="128">
-    <h2>POS AWESOME</h2>
+    <h1>Ascra POS</h1>
+    <h3>Retail Simplified with ERPNext</h3>
 </div>
 
-#### An open-source Point of Sale for [Erpnext](https://github.com/frappe/erpnext) using [Vue.js](https://github.com/vuejs/vue) and [Vuetify](https://github.com/vuetifyjs/vuetify) (VERSION 15 and 16 Support)
+#### An open-source Point of Sale for [ERPNext](https://github.com/frappe/erpnext) using [Vue.js](https://github.com/vuejs/vue) and [Vuetify](https://github.com/vuetifyjs/vuetify) (Fully Compatible with ERPNext v15)
 
 ---
 
-NOTE: Application is undergoing major refactoring. please report for any bug or issue it will be solved on high priority. For now it is stable and tested.
+**Developed by Amit Kumar**
 
-Recommended to use stable version for production. 
+Ascra POS is a reverse-engineered and enhanced version of POS Awesome, fully compatible with ERPNext v15. This modern POS system is designed for seamless deployment on Frappe Cloud and self-hosted environments, offering a robust retail management solution integrated with ERPNext's powerful backend.
+
+---
+
+### What Makes Ascra POS Different?
+
+- **Full ERPNext v15 Compatibility**: Built specifically for ERPNext v15, ensuring seamless integration with the latest ERPNext features and APIs
+- **Frappe Cloud Ready**: Optimized for easy deployment on Frappe Cloud with minimal configuration
+- **Enhanced Batch Management**: Advanced batch selection with quantity indicators, expiry date display, and smart auto-selection
+- **Modern Architecture**: Reverse-engineered and modernized codebase using Vue 3 Composition API and TypeScript
+- **Improved UX**: Streamlined workflows with intuitive batch selection, automatic quantity assignment, and real-time stock visibility
+- **Production Ready**: Stable and tested for production environments with comprehensive error handling
+- **Open Source**: Licensed under GNU GPL v3, allowing customization and community contributions
 
 ### Quick Start
 
-Follow these steps to install and start using POS Awesome:
+Follow these steps to install and start using Ascra POS:
 
 1. **Install the app** in your bench:
-    1. `bench get-app https://github.com/defendicon/POS-Awesome-V15`
+    1. `bench get-app https://github.com/amitascra/POS-Awesome-V15`
     2. `bench setup requirements`
     3. `bench build --app posawesome`
     4. `bench restart`
     5. `bench --site your.site.name install-app posawesome`
     6. `bench --site your.site.name migrate`
 
-2. **Open the POS Awesome workspace**
+2. **Open the Ascra POS workspace**
 
-    Log in to ERPNext, go to the home page, and click **POS Awesome** from the left-hand menu.
+    Log in to ERPNext, go to the home page, and click **Ascra POS** from the left-hand menu.
 
 3. **Create a POS Profile**
-    - Navigate to **POS Awesome → POS Profile → New**.
+    - Navigate to **Ascra POS → POS Profile → New**.
     - Fill in the mandatory fields:
         - **Name** – any label for this profile.
         - **Company** – the company under which transactions will be recorded.
@@ -45,9 +58,32 @@ Follow these steps to install and start using POS Awesome:
 
 5. **Start selling**
 
-    Return to the **POS Awesome** workspace and launch the POS. Select the newly created profile if prompted and begin creating invoices.
+    Return to the **Ascra POS** workspace and launch the POS. Select the newly created profile if prompted and begin creating invoices.
 
-For more details, see the [POS Awesome Wiki](https://github.com/yrestom/POS-Awesome/wiki).
+---
+
+### New Features in Ascra POS
+
+#### 🎯 Quick Batch Selection in Cart
+- **Batch Dropdown in Cart Table**: Select batches directly from the cart without opening item details
+- **Smart Display**: Shows batch number, available quantity, and expiry date in the dropdown
+- **Auto-Set Quantity**: Automatically sets item quantity to the batch's available quantity when selected
+- **FIFO Logic**: Uses existing FIFO (First In, First Out) batch selection to avoid conflicts with batch splitting
+
+#### 📊 Batch Quantity Indicators
+- **Real-Time Stock Visibility**: Display batch quantities directly in the items selector table
+- **Color-Coded Indicators**: Visual indicators showing stock availability at a glance
+- **Quick Reference**: No need to open item details to check batch availability
+
+#### 📋 Batch Info Dialog
+- **Detailed Batch Information**: View comprehensive batch details including manufacturing date, expiry date, and available stock
+- **Interactive UI**: Easy-to-use dialog for accessing batch information
+- **Bundle Support**: View batch information for bundle items and their components
+
+#### 🔧 Technical Enhancements
+- **Improved Batch Column Visibility**: Fixed batch column visibility in cart table
+- **Responsive Design**: Batch dropdown and indicators work seamlessly across different screen sizes
+- **Performance Optimized**: Efficient data fetching and rendering for batch information
 
 ---
 
@@ -312,8 +348,12 @@ Notes:
 
 #### 📦 Inventory & Products
 
+- **Quick Batch Selection in Cart**: Select batches directly from the cart dropdown with quantity and expiry display
+- **Batch Quantity Indicators**: Real-time batch quantity visibility in the items selector table
+- **Batch Info Dialog**: Comprehensive batch information dialog with manufacturing date, expiry date, and stock details
+- **Auto-Set Batch Quantity**: Automatically sets item quantity to batch's available quantity when selected
 - **Batch & Serial**: Comprehensive support for Batch and Serial number selection and search.
-- **Product Bundles**: Auto-apply batches for bundle items.
+- **Product Bundles**: Auto-apply batches for bundle items with batch info dialog support.
 - **Variants**: Support for template items with product variants.
 - **UOM Support**: Barcode and pricing support specific to Units of Measure.
 - **Weighted Products**: Support for scale/weighted product barcodes.
@@ -439,6 +479,6 @@ These commands will rewrite files in-place so the CI checks pass.
 
 ### License
 
-GNU/General Public License (see [license.txt](https://github.com/yrestom/POS-Awesome/blob/master/license.txt))
+GNU/General Public License (see [license.txt](https://github.com/amitascra/POS-Awesome-V15/blob/develop/license.txt))
 
-The POS Awesome code is licensed as GNU General Public License (v3)
+The Ascra POS code is licensed as GNU General Public License (v3)

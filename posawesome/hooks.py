@@ -1,14 +1,14 @@
 app_name = "posawesome"
-app_title = "POS Awesome"
-app_publisher = "defendicon"
-app_description = "POS Awesome"
+app_title = "Ascra POS"
+app_publisher = "Amit Kumar"
+app_description = "Ascra POS - Retail Simplified with ERPNext"
 app_icon = "octicon octicon-file-directory"
 app_color = "grey"
-app_email = "defendicon@github.com"
+app_email = "amit@ascra.com"
 app_license = "GPLv3"
-app_url = "https://github.com/defendicon/POS-Awesome-V15"
-app_source_link = "https://github.com/defendicon/POS-Awesome-V15"
-source_link = "https://github.com/defendicon/POS-Awesome-V15"
+app_url = "https://github.com/amitascra/POS-Awesome-V15"
+app_source_link = "https://github.com/amitascra/POS-Awesome-V15"
+source_link = "https://github.com/amitascra/POS-Awesome-V15"
 
 # Includes in <head>
 # ------------------

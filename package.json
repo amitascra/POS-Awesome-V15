@@ -1,13 +1,15 @@
 {
   "name": "posawesome",
   "version": "15.29.0",
+  "author": "Amit Kumar",
+  "description": "Ascra POS - Retail Simplified with ERPNext",
   "repository": {
     "type": "git",
-    "url": "https://github.com/defendicon/POS-Awesome-V15.git"
+    "url": "https://github.com/amitascra/POS-Awesome-V15.git"
   },
-  "homepage": "https://github.com/defendicon/POS-Awesome-V15",
+  "homepage": "https://github.com/amitascra/POS-Awesome-V15",
   "bugs": {
-    "url": "https://github.com/defendicon/POS-Awesome-V15/issues"
+    "url": "https://github.com/amitascra/POS-Awesome-V15/issues"
   },
   "main": "electron/main.js",
   "scripts": {

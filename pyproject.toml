@@ -1,6 +1,7 @@
 [project]
 name = "posawesome"
 authors = [
+    { name = "Amit Kumar", email = "amit@ascra.com"},
     { name = "Youssef Restom", email = "youssef@totrox.com"},
     { name = "Abdul Manan", email="defendicon@github.com"},
     { name = "ASA Technologies", email = "dev@asaerp.com"},
@@ -8,7 +9,7 @@ authors = [
     { name = "Ahmed Osama", email = "eng.ahmed.osama.1190@gmail.com"},
     { name = "Samarth Upare", email = "samarth.upare@redtra.com"},
 ]
-description = "POS project that's simply awesome"
+description = "Ascra POS - Retail Simplified with ERPNext"
 requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]
@@ -68,6 +69,6 @@ target-version = ["py310"]
 
 
 [project.urls]
-Homepage = "https://github.com/defendicon/POS-Awesome-V15"
-Repository = "https://github.com/defendicon/POS-Awesome-V15.git"
-"Bug Reports" = "https://github.com/defendicon/POS-Awesome-V15/issues"
+Homepage = "https://github.com/amitascra/POS-Awesome-V15"
+Repository = "https://github.com/amitascra/POS-Awesome-V15.git"
+"Bug Reports" = "https://github.com/amitascra/POS-Awesome-V15/issues"
