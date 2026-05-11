@@ -432,34 +432,10 @@ export function useItemAddition() {
 
 				if (shouldAllocateAcrossBatches) {
 					// Get sorted availability (taking existing cart items into account)
-					// For manual split (new_line: true), use cached batch data to see all batches
-					// For auto-split (new_line: false), use API data to respect reservations
-					let batches;
-					logBatchFlow("Batch split triggered - checking data source", {
-						item_code: new_item.item_code,
-						new_line: context.new_line,
-						has_batch_no_data: !!item.batch_no_data,
-						batch_no_data_length: item.batch_no_data?.length || 0,
-					});
-					if (context.new_line && item.batch_no_data && item.batch_no_data.length > 0) {
-						// Manual split button clicked - use cached data to see all batches
-						batches = item.batch_no_data.map((b: any) => ({
-							batch_no: b.batch_no,
-							available_qty: b.available_qty ?? b.batch_qty ?? b.original_batch_qty ?? 0,
-							expiry_date: b.expiry_date,
-						}));
-						logBatchFlow("Using cached batch data for manual split", {
-							item_code: new_item.item_code,
-							cached_batches: batches.length,
-							cached_total: batches.reduce((sum, b) => sum + b.available_qty, 0),
-						});
-					} else {
-						// Auto-split - use API data to respect reservations
-						batches = await getBatchAvailabilityForItem(
-							context,
-							new_item,
-						);
-					}
+					const batches = await getBatchAvailabilityForItem(
+						context,
+						new_item,
+					);
 					// Filter for usable batches
 					const usable_batches = batches.filter(
 						(b) => b.available_qty > 0,
@@ -470,24 +446,6 @@ export function useItemAddition() {
 						// Fallback to standard behavior (likely picks first or none)
 						callSetBatchQty(context, new_item, null, false);
 					} else {
-						// Calculate total available qty across all batches
-						const total_available = usable_batches.reduce(
-							(sum, b) => sum + b.available_qty,
-							0
-						);
-						
-						// Check if total available is sufficient for requested qty
-						if (new_item.qty > total_available) {
-							// Insufficient stock - don't split, use standard behavior
-							logBatchFlow("Insufficient total batch availability, skipping split", {
-								item_code: new_item.item_code,
-								requested_qty: new_item.qty,
-								total_available,
-							});
-							callSetBatchQty(context, new_item, null, false);
-							// Don't return - let the item be added to cart with standard batch assignment
-						} else {
-						
 						let remaining_qty = new_item.qty;
 
 						const allocations: Array<{ batch: any; qty: number }> =
@@ -574,7 +532,6 @@ export function useItemAddition() {
 
 								extra_items.push(split_item);
 							}
-						}
 						}
 					}
 				} else {
