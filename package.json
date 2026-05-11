@@ -2,7 +2,7 @@
   "name": "posawesome",
   "version": "15.29.0",
   "author": "Amit Kumar",
-  "description": "Ascra POS - Retail Simplified with ERPNext",
+  "description": "Ascra POS - Retail Simplified with ERPNext (Upgraded for v15 & v16 Support)",
   "repository": {
     "type": "git",
     "url": "https://github.com/amitascra/POS-Awesome-V15.git"

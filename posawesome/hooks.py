@@ -1,7 +1,7 @@
 app_name = "posawesome"
 app_title = "Ascra POS"
 app_publisher = "Amit Kumar"
-app_description = "Ascra POS - Retail Simplified with ERPNext"
+app_description = "Ascra POS - Retail Simplified with ERPNext (Upgraded for v15 & v16 Support)"
 app_icon = "octicon octicon-file-directory"
 app_color = "grey"
 app_email = "amit@ascratech.com"

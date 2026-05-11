@@ -9,7 +9,7 @@ authors = [
     { name = "Ahmed Osama", email = "eng.ahmed.osama.1190@gmail.com"},
     { name = "Samarth Upare", email = "samarth.upare@redtra.com"},
 ]
-description = "Ascra POS - Retail Simplified with ERPNext"
+description = "Ascra POS - Retail Simplified with ERPNext (Upgraded for v15 & v16 Support)"
 requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]

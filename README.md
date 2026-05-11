@@ -4,13 +4,17 @@
     <h3>Retail Simplified with ERPNext</h3>
 </div>
 
-#### An open-source Point of Sale for [ERPNext](https://github.com/frappe/erpnext) using [Vue.js](https://github.com/vuejs/vue) and [Vuetify](https://github.com/vuetifyjs/vuetify) (Fully Compatible with ERPNext v15)
+#### An open-source Point of Sale for [ERPNext](https://github.com/frappe/erpnext) using [Vue.js](https://github.com/vuejs/vue) and [Vuetify](https://github.com/vuetifyjs/vuetify) (Fully Compatible with ERPNext v15 & v16)
 
 ---
 
-**Developed by Amit Kumar**
+**Upgraded and maintained by Amit Kumar for ERPNext v15 & v16 Support**
 
 Ascra POS is a reverse-engineered and enhanced version of POS Awesome, fully compatible with ERPNext v15. This modern POS system is designed for seamless deployment on Frappe Cloud and self-hosted environments, offering a robust retail management solution integrated with ERPNext's powerful backend.
+
+**Note**: Ascra POS is built upon the original POS Awesome project by Youssef Restom and other contributors. This version focuses on upgrading and maintaining the codebase for ERPNext v15 & v16 compatibility, adding enhanced batch management features, and preparing for future migration to Frappe UI.
+
+**Future Roadmap**: Ascra POS will soon support Frappe UI as an alternative interface. In the future, Frappe UI will become the primary UI library for Ascra POS, providing a more modern and integrated experience with the Frappe ecosystem.
 
 ---
 
@@ -23,6 +27,7 @@ Ascra POS is a reverse-engineered and enhanced version of POS Awesome, fully com
 - **Improved UX**: Streamlined workflows with intuitive batch selection, automatic quantity assignment, and real-time stock visibility
 - **Production Ready**: Stable and tested for production environments with comprehensive error handling
 - **Open Source**: Licensed under GNU GPL v3, allowing customization and community contributions
+- **Frappe UI Roadmap**: Planned migration to Frappe UI as the primary interface library for better integration with the Frappe ecosystem
 
 ### Quick Start
 
