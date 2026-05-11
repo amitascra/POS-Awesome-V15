@@ -461,8 +461,8 @@ export function useItemAddition() {
 								total_available,
 							});
 							callSetBatchQty(context, new_item, null, false);
-							return;
-						}
+							// Don't return - let the item be added to cart with standard batch assignment
+						} else {
 						
 						let remaining_qty = new_item.qty;
 
@@ -550,6 +550,7 @@ export function useItemAddition() {
 
 								extra_items.push(split_item);
 							}
+						}
 						}
 					}
 				} else {
