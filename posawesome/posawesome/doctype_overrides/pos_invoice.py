@@ -26,9 +26,14 @@ class CustomSerialBatchCreation(ERPNextSerialBatchCreation):
 			try:
 				voucher_doc = frappe.db.get_value(doc.voucher_type, doc.voucher_no, "is_pos")
 				if voucher_doc:
+					frappe.logger().info(
+						f"[POSAwesome] Skipping ERPNext bundle validation for POS invoice {doc.voucher_no} "
+						f"(item: {doc.item_code}, warehouse: {doc.warehouse})"
+					)
 					return
-			except Exception:
+			except Exception as e:
 				# If we can't check is_pos, proceed with normal validation
+				frappe.logger().warning(f"[POSAwesome] Error checking is_pos for bundle validation: {e}")
 				pass
 
 		# Call parent validation for non-POS invoices
