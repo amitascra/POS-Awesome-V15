@@ -378,6 +378,7 @@ const performBatchSplit = (item: any, newQty: number) => {
 		setBatchQty: props.setBatchQty,
 		set_batch_qty: props.setBatchQty,
 		new_line: true, // prevent merging with existing rows
+		force_batch_allocation: true, // force batch allocation even if qty doesn't exceed first batch
 	};
 	const itemToReAdd = {
 		...item,
