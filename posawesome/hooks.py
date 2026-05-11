@@ -169,7 +169,8 @@ doc_events = {
 
 # Override standard DocTypes with custom classes
 override_doctype_class = {
-    "POS Invoice": "posawesome.posawesome.overrides.pos_invoice.CustomPOSInvoice",
+    "Sales Invoice": "posawesome.posawesome.doctype_overrides.sales_invoice.CustomSalesInvoice",
+    "POS Invoice": "posawesome.posawesome.doctype_overrides.pos_invoice.CustomPOSInvoice",
     "POS Invoice Merge Log": "posawesome.posawesome.overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog",
 }
 

@@ -3,71 +3,74 @@
 		<template v-for="column in visibleColumns" :key="column.key">
 			<!-- Item Name Column -->
 			<td v-if="column.key === 'item_name'" class="text-start" :data-column-key="'item_name'">
-				<div class="d-flex align-center">
-					<span>{{ item.item_name }}</span>
-					<v-chip v-if="item.is_bundle" color="secondary" size="x-small" class="ml-1">
-						{{ __("Bundle") }}
-					</v-chip>
-					<v-chip v-if="item.name_overridden" color="primary" size="x-small" class="ml-1">
-						{{ __("Edited") }}
-					</v-chip>
-					<v-chip
-						v-if="item.batch_no_is_expired"
-						color="error"
-						size="x-small"
-						variant="flat"
-						class="ml-1"
-					>
-						{{ __("Expired") }}
-					</v-chip>
-					<v-chip
-						v-if="item.has_batch_no && item.batch_no"
-						color="info"
-						size="x-small"
-						variant="tonal"
-						class="ml-1"
-					>
-						{{ __("Batch") }}: {{ item.batch_no }}
-					</v-chip>
-					<v-chip
-						v-if="item.posa_is_offer || item.is_free_item"
-						color="success"
-						size="x-small"
-						variant="flat"
-						class="me-1"
-					>
-						{{ __("Offer Item") }}
-					</v-chip>
-					<v-tooltip v-if="item.pricing_rule_badge" location="bottom">
-						<template #activator="{ props }">
-							<v-chip v-bind="props" color="primary" size="x-small" class="ml-1">
-								{{ item.pricing_rule_badge.label }}
-							</v-chip>
-						</template>
-						<span>{{ item.pricing_rule_badge.tooltip }}</span>
-					</v-tooltip>
-					<v-btn
-						v-if="posProfile.posa_allow_line_item_name_override && !item.posa_is_replace"
-						icon
-						size="x-small"
-						variant="text"
-						class="ml-1"
-						@click.stop="$emit('open-name-dialog', item)"
-						:aria-label="__('Edit item name')"
-					>
-						<v-icon size="small">mdi-pencil</v-icon>
-					</v-btn>
-					<v-btn
-						v-if="item.name_overridden"
-						icon
-						size="x-small"
-						variant="text"
-						class="ml-1"
-						@click.stop="$emit('reset-item-name', item)"
-						:aria-label="__('Reset item name')"
-					>
-						<v-icon size="small">mdi-undo</v-icon>
-					</v-btn>
+				<div class="posa-item-name-container">
+					<div class="posa-item-name-main">
+						<span class="posa-item-name-text">{{ item.item_name }}</span>
+					</div>
+					<div class="posa-item-badges">
+						<v-chip v-if="item.is_bundle" color="secondary" size="x-small" variant="tonal">
+							{{ __("Bundle") }}
+						</v-chip>
+						<v-chip v-if="item.name_overridden" color="primary" size="x-small" variant="tonal">
+							{{ __("Edited") }}
+						</v-chip>
+						<v-chip
+							v-if="item.batch_no_is_expired"
+							color="error"
+							size="x-small"
+							variant="tonal"
+						>
+							{{ __("Expired") }}
+						</v-chip>
+						<v-chip
+							v-if="item.has_batch_no && item.batch_no"
+							:color="needsBatchSplit ? 'warning' : 'info'"
+							size="x-small"
+							variant="tonal"
+						>
+							{{ __("Batch") }}: {{ item.batch_no }}
+						</v-chip>
+						<v-chip
+							v-if="item.posa_is_offer || item.is_free_item"
+							color="success"
+							size="x-small"
+							variant="tonal"
+						>
+							{{ __("Offer Item") }}
+						</v-chip>
+						<v-tooltip v-if="item.pricing_rule_badge" location="bottom">
+							<template #activator="{ props }">
+								<v-chip v-bind="props" color="primary" size="x-small" variant="tonal">
+									{{ item.pricing_rule_badge.label }}
+								</v-chip>
+							</template>
+							<span>{{ item.pricing_rule_badge.tooltip }}</span>
+						</v-tooltip>
+					</div>
+					<div class="posa-item-actions">
+						<v-btn
+							v-if="posProfile.posa_allow_line_item_name_override && !item.posa_is_replace"
+							icon
+							size="x-small"
+							variant="text"
+							density="compact"
+							@click.stop="$emit('open-name-dialog', item)"
+							:aria-label="__('Edit item name')"
+						>
+							<v-icon size="small">mdi-pencil</v-icon>
+						</v-btn>
+						<v-btn
+							v-if="item.name_overridden"
+							icon
+							size="x-small"
+							variant="text"
+							density="compact"
+							@click.stop="$emit('reset-item-name', item)"
+							:aria-label="__('Reset item name')"
+						>
+							<v-icon size="small">mdi-undo</v-icon>
+						</v-btn>
+					</div>
 				</div>
 			</td>
 
@@ -77,7 +80,9 @@
 					<v-btn
 						:disabled="disableDecrement"
 						size="small"
-						variant="flat"
+						variant="tonal"
+						color="primary"
+						density="compact"
 						class="posa-cart-table__qty-btn posa-cart-table__qty-btn--minus minus-btn qty-control-btn"
 						@click.stop="handleMinusClick"
 						:aria-label="__('Decrease quantity')"
@@ -119,7 +124,9 @@
 					<v-btn
 						:disabled="disableIncrement"
 						size="small"
-						variant="flat"
+						variant="tonal"
+						color="primary"
+						density="compact"
 						class="posa-cart-table__qty-btn posa-cart-table__qty-btn--plus plus-btn qty-control-btn"
 						@click.stop="$emit('add-one', item)"
 						:aria-label="__('Increase quantity')"
@@ -325,14 +332,44 @@
 
 			<!-- Amount Column -->
 			<td v-else-if="column.key === 'amount'" class="text-center" :data-column-key="'amount'">
-				<div class="currency-display right-aligned">
-					<span class="currency-symbol">{{ currencySymbol(displayCurrency) }}</span>
+				<div class="posa-amount-display">
+					<span class="posa-amount-currency">{{ currencySymbol(displayCurrency) }}</span>
 					<span
-						class="amount-value"
+						class="posa-amount-value"
 						:class="{ 'negative-number': isNegative(item.qty * item.rate) }"
 					>
 						{{ formatCurrency(item.qty * item.rate) }}
 					</span>
+				</div>
+			</td>
+
+			<!-- Batch Column (Optional) -->
+			<td v-else-if="column.key === 'batch'" class="text-center" :data-column-key="'batch'">
+				<div v-if="item.has_batch_no" class="posa-cart-table__batch-selector">
+					<v-select
+						v-if="item.batch_no_data && item.batch_no_data.length > 0"
+						:model-value="item.batch_no"
+						:items="getDisplayableBatchOptions(item.batch_no_data)"
+						item-title="batch_no"
+						item-value="batch_no"
+						density="compact"
+						variant="outlined"
+						hide-details
+						class="batch-select"
+						@update:model-value="$emit('change-batch', { item, batch: $event })"
+						:disabled="!!item.posa_is_replace"
+					>
+						<template v-slot:item="{ props, item: batchItem }">
+							<v-list-item v-bind="props">
+								<v-list-item-title>{{ getRaw(batchItem).batch_no }}</v-list-item-title>
+								<v-list-item-subtitle>
+									{{ __("Qty: {0}", [getRaw(batchItem).available_qty ?? getRaw(batchItem).batch_qty ?? 0]) }}
+									<span v-if="getRaw(batchItem).expiry_date"> | {{ __("Exp: {0}", [formatDate(getRaw(batchItem).expiry_date)]) }}</span>
+								</v-list-item-subtitle>
+							</v-list-item>
+						</template>
+					</v-select>
+					<span v-else class="text-caption text-secondary">{{ __("No batches") }}</span>
 				</div>
 			</td>
 
@@ -355,6 +392,22 @@
 
 			<!-- Actions -->
 			<td v-else-if="column.key === 'actions'" class="text-center" :data-column-key="'actions'">
+				<v-tooltip v-if="item.has_batch_no && item.batch_no && !isReturnInvoice" location="bottom">
+					<template #activator="{ props }">
+						<v-btn
+							v-bind="props"
+							size="small"
+							variant="flat"
+							:color="needsBatchSplit ? 'warning' : 'primary'"
+							class="mr-1"
+							@click.stop="$emit('batch-split', item)"
+							:aria-label="__('Split across batches')"
+						>
+							<v-icon size="small">mdi-call-split</v-icon>
+						</v-btn>
+					</template>
+					<span>{{ __("Split across available batches") }}</span>
+				</v-tooltip>
 				<v-btn
 					:disabled="!!item.posa_is_replace"
 					size="small"
@@ -377,12 +430,10 @@
 					size="small"
 					variant="text"
 					class="posa-cart-table__expand-btn"
-					@click.stop="$emit('toggle-expand')"
-					:aria-label="isExpanded ? __('Collapse item details') : __('Expand item details')"
+					@click.stop="$emit('open-details-dialog', item)"
+					:aria-label="__('View item details')"
 				>
-					<v-icon size="small">
-						{{ isExpanded ? "mdi-chevron-up" : "mdi-chevron-down" }}
-					</v-icon>
+					<v-icon size="small">mdi-open-in-new</v-icon>
 				</v-btn>
 			</td>
 		</template>
@@ -435,6 +486,8 @@ const emit = defineEmits([
 	"toggle-offer",
 	"toggle-expand",
 	"remove-item",
+	"batch-split",
+	"change-batch",
 ]);
 
 const __ = window.__ || ((text) => text);
@@ -491,6 +544,16 @@ const memoDeps = computed(() => {
 });
 
 const qtyLength = computed(() => String(Math.abs(props.item.qty || 0)).replace(".", "").length);
+
+const needsBatchSplit = computed(() => {
+	if (!props.item.has_batch_no || !props.item.batch_no || props.isReturnInvoice) {
+		return false;
+	}
+	const qty = parseFloat(props.item.qty) || 0;
+	const batchQty = parseFloat(props.item.actual_batch_qty);
+	// Show split button if qty exceeds batch availability OR batch qty is unknown/zero
+	return qty > batchQty || !batchQty || batchQty <= 0;
+});
 
 const disableDecrement = computed(
 	() =>
@@ -667,6 +730,61 @@ function closeDiscountAmountEdit() {
 		editingDiscountAmountValue.value = "";
 	}
 }
+
+function getDisplayableBatchOptions(batchList) {
+	if (!Array.isArray(batchList)) {
+		return [];
+	}
+	const filtered = batchList.filter((batch) => {
+		if (!batch?.batch_no) return false;
+		const rawBatch = getRaw(batch);
+		const rawAvailableQty = rawBatch.available_qty ?? rawBatch.batch_qty ?? rawBatch.original_batch_qty;
+		const availableQty = Number(rawAvailableQty);
+		return Number.isFinite(availableQty) && availableQty > 0;
+	});
+	
+	// Sort to match existing auto-selection logic (FIFO: earliest expiry first)
+	return filtered.sort((a, b) => {
+		const aRaw = getRaw(a);
+		const bRaw = getRaw(b);
+		
+		// FIFO: Sort by expiry date (earliest first)
+		if (aRaw.expiry_date && bRaw.expiry_date) {
+			return (
+				new Date(aRaw.expiry_date).getTime() -
+				new Date(bRaw.expiry_date).getTime()
+			);
+		} else if (aRaw.expiry_date) {
+			return -1;
+		} else if (bRaw.expiry_date) {
+			return 1;
+		} else if (aRaw.manufacturing_date && bRaw.manufacturing_date) {
+			return (
+				new Date(aRaw.manufacturing_date).getTime() -
+				new Date(bRaw.manufacturing_date).getTime()
+			);
+		} else if (aRaw.manufacturing_date) {
+			return -1;
+		} else if (bRaw.manufacturing_date) {
+			return 1;
+		}
+		return 0;
+	});
+}
+
+function formatDate(dateStr) {
+	if (!dateStr) return "";
+	try {
+		const date = new Date(dateStr);
+		return date.toLocaleDateString();
+	} catch {
+		return dateStr;
+	}
+}
+
+function getRaw(item) {
+	return item?.raw || item || {};
+}
 </script>
 
 <style scoped>
@@ -724,11 +842,92 @@ td {
 }
 
 /* Keyboard focus styles */
-/* Keyboard focus styles */
 .posa-cart-table__qty-display:focus-visible,
 .posa-cart-table__editor-display:focus-visible {
 	outline: 2px solid var(--pos-primary);
 	outline-offset: 2px;
 	z-index: 10;
+}
+
+/* Improved Item Name Container Styling */
+.posa-item-name-container {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	width: 100%;
+	align-items: flex-start;
+}
+
+.posa-item-name-main {
+	display: flex;
+	align-items: center;
+	width: 100%;
+}
+
+.posa-item-name-text {
+	font-weight: 500;
+	font-size: 0.95rem;
+	color: var(--pos-text-primary);
+	line-height: 1.4;
+	word-break: break-word;
+	flex: 1;
+}
+
+.posa-cart-table__batch-selector {
+	width: 100%;
+}
+
+.batch-select {
+	font-size: 0.85rem;
+}
+
+.posa-item-badges {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
+	width: 100%;
+}
+
+.posa-item-badges .v-chip {
+	font-size: 0.75rem;
+	height: 24px;
+	padding: 0 8px;
+}
+
+.posa-item-actions {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+}
+
+/* Improved Amount Display Styling */
+.posa-amount-display {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	width: 100%;
+	height: 100%;
+}
+
+.posa-amount-currency {
+	font-size: 0.85em;
+	opacity: 0.75;
+	font-weight: 400;
+}
+
+.posa-amount-value {
+	font-weight: 600;
+	font-size: 0.95rem;
+	font-family:
+		"SF Pro Display", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "Noto Sans Arabic", "Tahoma",
+		sans-serif;
+	font-variant-numeric: lining-nums tabular-nums;
+	font-feature-settings:
+		"tnum" 1,
+		"lnum" 1,
+		"kern" 1;
+	color: var(--pos-text-primary);
 }
 </style>

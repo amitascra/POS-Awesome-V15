@@ -133,6 +133,7 @@
 								:no-data-text="__('No items found')"
 								@row-click="click_item_row"
 								@list-scroll="onListScroll"
+								@batch-info-click="handleBatchInfoClick"
 							/>
 						</v-col>
 					</v-row>
@@ -171,6 +172,14 @@
 			@scanner-opened="onScannerOpened"
 			@scanner-closed="onScannerClosed"
 		/>
+
+		<!-- Batch Info Dialog -->
+		<BatchInfoDialog
+			ref="batchInfoDialog"
+			:item-code="selectedItemForBatchInfo?.item_code || ''"
+			:item-name="selectedItemForBatchInfo?.item_name || ''"
+			:warehouse="selectedItemForBatchInfo?.warehouse || pos_profile?.warehouse || ''"
+		/>
 	</div>
 </template>
 
@@ -197,6 +206,7 @@ import ItemsSelectorCards from "./ItemsSelectorCards.vue";
 import ItemsSelectorTable from "./ItemsSelectorTable.vue";
 import NewItemDialog from "./NewItemDialog.vue";
 import ScanErrorDialog from "./ScanErrorDialog.vue";
+import BatchInfoDialog from "./BatchInfoDialog.vue";
 
 import { useResponsive } from "../../../composables/core/useResponsive";
 import { useRtl } from "../../../composables/core/useRtl";
@@ -375,6 +385,36 @@ const {
 });
 
 const flyConfig = reactive({ speed: 0.6, easing: "ease-in-out" });
+
+// Batch Info Dialog State
+const batchInfoDialog = ref<any>(null);
+const selectedItemForBatchInfo = ref<any>(null);
+
+const handleBatchInfoClick = (item) => {
+	// Extract item data safely, handling potential Vue proxies
+	const rawItem = item ? { ...item } : null;
+	console.log("[BatchInfo] Clicked item:", rawItem);
+	
+	// Extract item_code directly to ensure it's available
+	const itemCode = rawItem?.item_code || rawItem?.name || '';
+	const itemName = rawItem?.item_name || rawItem?.name || '';
+	const warehouse = rawItem?.warehouse || pos_profile.value?.warehouse || '';
+	
+	console.log("[BatchInfo] Extracted - itemCode:", itemCode, "itemName:", itemName, "warehouse:", warehouse);
+	
+	// Store selected item for reference
+	selectedItemForBatchInfo.value = {
+		...rawItem,
+		item_code: itemCode,
+		item_name: itemName,
+		warehouse: warehouse,
+	};
+	
+	// Pass parameters directly to open() method to avoid reactivity timing issues
+	if (batchInfoDialog.value?.open) {
+		batchInfoDialog.value.open(itemCode, itemName, warehouse);
+	}
+};
 
 // 3. Computed Properties
 const pos_profile = computed(() => (itemsIntegration.posProfile.value || {}) as any);

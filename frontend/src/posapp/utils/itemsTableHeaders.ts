@@ -58,6 +58,13 @@ export function getItemsTableHeaders(context: "pos" | "purchase" | string, posPr
         { title: __("Rate"), key: "rate", align: "start" },
         { title: __("Available QTY"), key: "actual_qty", align: "start" },
         { title: __("UOM"), key: "stock_uom", align: "start" },
+        {
+            title: __("Batch Info"),
+            key: "batch_info",
+            align: "center",
+            sortable: false,
+            width: "120px",
+        },
     ];
 
     // Remove item code column if configured

@@ -100,6 +100,30 @@
 					{{ formatActualQty(item.actual_qty) }}
 				</span>
 			</template>
+
+			<template v-slot:item.batch_info="{ item }">
+				<v-btn
+					icon
+					size="small"
+					variant="tonal"
+					:color="item.has_batch_no ? 'primary' : 'default'"
+					@click.stop="$emit('batch-info-click', item)"
+					:aria-label="__('View batch information')"
+				>
+					<v-icon size="small">mdi-information-outline</v-icon>
+					<v-tooltip activator="parent" location="bottom">
+						<template #default>
+							<div v-if="item.has_batch_no">
+								<div>{{ __("View Batch Info") }}</div>
+								<div v-if="item.actual_batch_qty" class="text-caption mt-1">
+									{{ __("Available: {0}", [formatNumber(item.actual_batch_qty)]) }}
+								</div>
+							</div>
+							<div v-else>{{ __("No Batch Tracking") }}</div>
+						</template>
+					</v-tooltip>
+				</v-btn>
+			</template>
 		</v-data-table-virtual>
 	</div>
 </template>
@@ -128,7 +152,7 @@ const props = defineProps({
 	noDataText: { type: String, default: "" },
 });
 
-const emit = defineEmits(["row-click", "list-scroll"]);
+const emit = defineEmits(["row-click", "list-scroll", "batch-info-click"]);
 
 const handleRowClick = (event, data) => {
 	emit("row-click", event, data);

@@ -68,14 +68,14 @@ export function useItemAddition() {
 		return sharedBatchSerial.setSerialNo(item, context);
 	};
 
-	const getBatchAvailabilityForItem = (context: any, item: any) => {
+	const getBatchAvailabilityForItem = async (context: any, item: any) => {
 		if (typeof context?.getBatchAvailability === "function") {
-			return context.getBatchAvailability(item, context);
+			return await context.getBatchAvailability(item, context);
 		}
 		if (typeof context?.get_batch_availability === "function") {
-			return context.get_batch_availability(item, context);
+			return await context.get_batch_availability(item, context);
 		}
-		return sharedBatchSerial.getBatchAvailability(item, context);
+		return await sharedBatchSerial.getBatchAvailability(item, context);
 	};
 
 	const getRequestedSerialQty = (item: any) => {
@@ -396,26 +396,43 @@ export function useItemAddition() {
 					new_item.serial_no_selected.push(item.to_set_serial_no);
 					item.to_set_serial_no = null;
 				}
-				// Handle batch number logic
-				if (item.has_batch_no && item.to_set_batch_no) {
-					new_item.batch_no = item.to_set_batch_no;
-					item.to_set_batch_no = null;
-					item.batch_no = null;
-					callSetBatchQty(context, new_item, new_item.batch_no, false);
-				}
+				
 				const extra_items: any[] = [];
 				const requestedQtyForBatching = Math.abs(
 					Number(new_item.qty || 0),
 				);
-				const shouldAllocateAcrossBatches =
+				
+				// Check if we should split across batches BEFORE assigning manual batch
+				// This prevents manual batch selection from blocking auto-splitting
+				// Split ONLY if: has batch, no batch assigned yet, AND auto-set enabled AND qty exceeds single batch availability
+				let shouldAllocateAcrossBatches = false;
+				
+				if (
 					new_item.has_batch_no &&
 					!new_item.batch_no &&
-					(shouldAutoSetBatch(context, new_item) ||
-						requestedQtyForBatching > 1);
+					!item.to_set_batch_no && // Don't split if user manually selected a batch
+					shouldAutoSetBatch(context, new_item)
+				) {
+					// Check if qty exceeds what a single batch can handle
+					const batches = await getBatchAvailabilityForItem(context, new_item);
+					const usable_batches = batches.filter((b) => b.available_qty > 0);
+					if (usable_batches.length > 0) {
+						const first_batch_qty = usable_batches[0]?.available_qty || 0;
+						// Split ONLY if requested qty exceeds first batch availability
+						if (requestedQtyForBatching > first_batch_qty) {
+							shouldAllocateAcrossBatches = true;
+							logBatchFlow("Auto-splitting triggered: qty exceeds single batch availability", {
+								item_code: new_item.item_code,
+								requested_qty: requestedQtyForBatching,
+								first_batch_qty: first_batch_qty,
+							});
+						}
+					}
+				}
 
 				if (shouldAllocateAcrossBatches) {
 					// Get sorted availability (taking existing cart items into account)
-					const batches = getBatchAvailabilityForItem(
+					const batches = await getBatchAvailabilityForItem(
 						context,
 						new_item,
 					);
@@ -517,9 +534,18 @@ export function useItemAddition() {
 							}
 						}
 					}
-				} else if (shouldAutoSetBatch(context, new_item)) {
-					// Fallback if getBatchAvailability is missing (should not happen after update)
-					callSetBatchQty(context, new_item, null, false);
+				} else {
+					// Not splitting - handle manual batch selection or auto-assign single batch
+					if (item.has_batch_no && item.to_set_batch_no) {
+						// User manually selected a batch
+						new_item.batch_no = item.to_set_batch_no;
+						item.to_set_batch_no = null;
+						item.batch_no = null;
+						callSetBatchQty(context, new_item, new_item.batch_no, false);
+					} else if (shouldAutoSetBatch(context, new_item)) {
+						// Auto-assign single batch
+						callSetBatchQty(context, new_item, null, false);
+					}
 				}
 				// Make quantity negative for returns
 				if (context.isReturnInvoice) {

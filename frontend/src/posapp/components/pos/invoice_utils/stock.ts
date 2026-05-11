@@ -192,7 +192,7 @@ export function set_serial_no(context: any, item: any) {
 	return setSerialNo(item, context);
 }
 
-export function set_batch_qty(
+export async function set_batch_qty(
 	context: any,
 	item: any,
 	value: any,
@@ -200,7 +200,7 @@ export function set_batch_qty(
 ) {
 	// legacy delegate
 	const { setBatchQty } = getBatchSerialApi();
-	return setBatchQty(item, value, update, context);
+	return await setBatchQty(item, value, update, context);
 }
 
 export function calc_uom(context: any, item: any, value: any) {

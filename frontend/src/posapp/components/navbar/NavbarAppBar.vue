@@ -41,11 +41,11 @@
 				role="button"
 			>
 				<template v-if="isMobile">
-					<span class="pos-navbar-title-compact">{{ __("POS") }}</span>
+					<span class="pos-navbar-title-compact">{{ __("Ascra POS") }}</span>
 				</template>
 				<template v-else>
-					<span class="font-weight-light pos-navbar-title-light">{{ __("POS") }}</span
-					><span class="pos-navbar-title-bold">{{ __("Awesome") }}</span>
+					<span class="font-weight-light pos-navbar-title-light">{{ __("Ascra") }}</span
+					><span class="pos-navbar-title-bold">{{ __("POS") }}</span>
 				</template>
 			</v-toolbar-title>
 		</div>

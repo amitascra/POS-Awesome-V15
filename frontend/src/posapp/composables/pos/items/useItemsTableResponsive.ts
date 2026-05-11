@@ -32,7 +32,8 @@ export function getResponsiveVisibleHeaders(
 				header.key === "item_name" ||
 				header.key === "qty" ||
 				header.key === "actions" ||
-				header.key === "amount"
+				header.key === "amount" ||
+				header.key === "batch"
 			) {
 				return true;
 			}
@@ -84,6 +85,7 @@ const calculateColumnWidth = (header: TableHeader, width: number) => {
 		price_list_rate: { min: 120, max: 140, ratio: 0.13 },
 		actions: { min: 80, max: 100, ratio: 0.08 },
 		posa_is_offer: { min: 70, max: 90, ratio: 0.06 },
+		batch: { min: 120, max: 150, ratio: 0.1 },
 	};
 
 	const config = baseWidths[header.key] || {
@@ -106,6 +108,7 @@ const calculateMinColumnWidth = (header: TableHeader) => {
 		price_list_rate: 120,
 		actions: 80,
 		posa_is_offer: 70,
+		batch: 120,
 	};
 	return minWidths[header.key] || 80;
 };

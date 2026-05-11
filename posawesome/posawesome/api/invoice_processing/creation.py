@@ -1402,7 +1402,6 @@ def validate_cart_items(items, pos_profile=None):
 
     Returns blocking errors and warning-only shortages for front-end checks.
     """
-
     if isinstance(items, str):
         items = json.loads(items)
 

@@ -20,7 +20,6 @@
 			:items-per-page="virtualScrollConfig.itemsPerPage"
 			:item-height="virtualScrollConfig.itemHeight"
 			:buffer-size="virtualScrollConfig.bufferSize"
-			expand-on-click
 			fixed-header
 			:density="tableDensity"
 			hide-default-footer
@@ -67,8 +66,10 @@
 					@reset-item-name="resetItemName"
 					@toggle-offer="toggleOffer"
 					@toggle-expand="handleToggleExpand(internalItem, toggleExpand)"
+					@open-details-dialog="openItemDetailsDialog"
 					@remove-item="removeItem"
-					@click="handleRowClick($event, item, toggleExpand, internalItem)"
+					@batch-split="handleBatchSplit"
+					@change-batch="handleBatchChange"
 				/>
 			</template>
 
@@ -121,12 +122,61 @@
 				</v-card-actions>
 			</v-card>
 		</v-dialog>
+
+		<!-- Item Details Dialog -->
+		<ItemDetailsDialog
+			v-model="itemDetailsDialog"
+			:item="selectedItemForDetails"
+			:pos_profile="pos_profile"
+			:invoiceType="invoiceType"
+			:isReturnInvoice="isReturnInvoice"
+			:invoice_doc="invoice_doc"
+			:hide_qty_decimals="hide_qty_decimals"
+			:formatFloat="memoizedFormatFloat"
+			:formatCurrency="memoizedFormatCurrency"
+			:currencySymbol="currencySymbol"
+			:isNumber="isNumber"
+			:setFormatedCurrency="setFormatedCurrency"
+			:calcPrices="calcPrices"
+			:calcUom="calcUom"
+			:changePriceListRate="changePriceListRate"
+			:getSerialOptions="getSerialOptions"
+			:setSerialNo="setSerialNo"
+			:setBatchQty="setBatchQty"
+			:validateDueDate="validateDueDate"
+			@qty-change="handleQtyChange"
+		/>
+
+		<!-- Batch Split Confirmation Dialog -->
+		<v-dialog v-model="batchSplitConfirmDialog" max-width="500">
+			<v-card>
+				<v-card-title class="text-h6">{{ __("Batch Split Required") }}</v-card-title>
+				<v-card-text>
+					<p v-if="pendingSplitItem">
+						{{ __("Only") }} <strong>{{ formatFloat(pendingSplitItem.actual_batch_qty || 0) }}</strong>
+						{{ __("units available in Batch") }}
+						<strong>{{ pendingSplitItem.batch_no }}</strong>.
+					</p>
+					<p v-if="pendingSplitItem && pendingSplitQty">
+						{{ __("Split remaining") }}
+						<strong>{{ formatFloat(pendingSplitQty - (pendingSplitItem.actual_batch_qty || 0)) }}</strong>
+						{{ __("units across other available batches?") }}
+					</p>
+				</v-card-text>
+				<v-card-actions>
+					<v-spacer></v-spacer>
+					<v-btn variant="text" @click="cancelBatchSplit">{{ __("Cancel") }}</v-btn>
+					<v-btn color="warning" variant="flat" @click="confirmBatchSplit">{{ __("Split") }}</v-btn>
+				</v-card-actions>
+			</v-card>
+		</v-dialog>
 	</div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onBeforeUnmount, onMounted, watch, getCurrentInstance } from "vue";
 import { useInvoiceStore } from "../../../stores/invoiceStore";
+import { useItemAddition } from "../../../composables/pos/items/useItemAddition";
 import { loadItemSelectorSettings } from "../../../utils/itemSelectorSettings";
 import { logComponentRender } from "../../../utils/perf";
 import CartItemRow from "./CartItemRow.vue";
@@ -143,6 +193,7 @@ import { useItemsTableNameEdit } from "../../../composables/pos/items/useItemsTa
 import { useFormatters } from "../../../composables/core/useFormatters";
 import { useRtl } from "../../../composables/core/useRtl";
 import { focusCartItemField, type CartShortcutField } from "../../../utils/cartFieldFocus";
+import ItemDetailsDialog from "./ItemDetailsDialog.vue";
 import "./items-table-styles.css";
 
 // Global declarations for Frappe
@@ -310,8 +361,95 @@ const handleMinusClick = (item: any) => {
 	eventBus?.emit("recalculate_return_discount", { defer: true });
 };
 
+const { addItem, removeItem: removeItemFromStore } = useItemAddition();
+
+// Batch split confirmation state
+const batchSplitConfirmDialog = ref(false);
+const pendingSplitItem = ref<any>(null);
+const pendingSplitQty = ref<number>(0);
+
+const performBatchSplit = (item: any, newQty: number) => {
+	const context = {
+		invoiceStore,
+		items: invoiceStore.items,
+		pos_profile: props.pos_profile,
+		isReturnInvoice: false,
+		stock_settings: props.stock_settings,
+		setBatchQty: props.setBatchQty,
+		set_batch_qty: props.setBatchQty,
+		new_line: true, // prevent merging with existing rows
+	};
+	const itemToReAdd = {
+		...item,
+		qty: newQty,
+		batch_no: null,
+		to_set_batch_no: null,
+		posa_row_id: null,
+	};
+	props.removeItem(item);
+	addItem(itemToReAdd, context);
+	eventBus?.emit("recalculate_return_discount", { defer: true });
+};
+
 const handleQtyUpdate = (item: any, newQty: any) => {
+	// For batched items: if new qty exceeds current batch availability,
+	// show confirmation dialog before splitting
+	if (
+		item?.has_batch_no &&
+		item?.batch_no &&
+		!props.isReturnInvoice &&
+		props.pos_profile?.posa_auto_set_batch
+	) {
+		const parsedQty = parseFloat(newQty) || 0;
+		const batchAvail = Number(item.actual_batch_qty) || 0;
+		if (parsedQty > batchAvail && batchAvail > 0) {
+			// Show confirmation dialog
+			pendingSplitItem.value = item;
+			pendingSplitQty.value = parsedQty;
+			batchSplitConfirmDialog.value = true;
+			return;
+		}
+	}
 	props.setFormatedQty(item, "qty", null, false, newQty);
+	eventBus?.emit("recalculate_return_discount", { defer: true });
+};
+
+const confirmBatchSplit = () => {
+	if (pendingSplitItem.value && pendingSplitQty.value) {
+		performBatchSplit(pendingSplitItem.value, pendingSplitQty.value);
+	}
+	batchSplitConfirmDialog.value = false;
+	pendingSplitItem.value = null;
+	pendingSplitQty.value = 0;
+};
+
+const cancelBatchSplit = () => {
+	batchSplitConfirmDialog.value = false;
+	pendingSplitItem.value = null;
+	pendingSplitQty.value = 0;
+};
+
+const handleBatchSplit = (item: any) => {
+	// Manual batch split button clicked - split immediately without confirmation
+	const currentQty = parseFloat(item.qty) || 0;
+	performBatchSplit(item, currentQty);
+};
+
+const handleBatchChange = ({ item, batch }: { item: any; batch: string }) => {
+	// Handle batch selection change from the dropdown
+	props.setBatchQty(item, batch);
+	
+	// Auto-set item quantity to the batch's available quantity
+	if (batch && item.batch_no_data) {
+		const selectedBatch = item.batch_no_data.find((b: any) => b.batch_no === batch);
+		if (selectedBatch) {
+			const availableQty = selectedBatch.available_qty ?? selectedBatch.batch_qty ?? selectedBatch.original_batch_qty ?? 0;
+			if (availableQty > 0) {
+				props.setFormatedQty(item, "qty", null, false, availableQty.toString());
+			}
+		}
+	}
+	
 	eventBus?.emit("recalculate_return_discount", { defer: true });
 };
 
@@ -362,6 +500,15 @@ const onDropFromSelector = (event: DragEvent) => dragDropHandlers.onDropFromSele
 
 // Name editing logic
 const { editNameDialog, editedName, editNameTarget, openNameDialog, saveItemName, resetItemName } = nameEdit;
+
+// Item details dialog state
+const itemDetailsDialog = ref(false);
+const selectedItemForDetails = ref<any>(null);
+
+const openItemDetailsDialog = (item: any) => {
+	selectedItemForDetails.value = item;
+	itemDetailsDialog.value = true;
+};
 
 // Life-cycle
 onMounted(() => {

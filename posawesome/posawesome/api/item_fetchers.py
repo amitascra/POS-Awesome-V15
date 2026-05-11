@@ -257,24 +257,28 @@ def _fetch_batches(warehouse: str, item_codes: Tuple[str, ...]):
 
     qty_map: Dict[Tuple[str, str], float] = {}
 
-    # Primary source of batch quantities: Serial and Batch Entry records linked to SLEs.
+    # Path 1 (new-style): Serial and Batch Bundle joined via SLE.
+    # MUST mirror ERPNext's get_available_batches() which also joins through SLE.
+    # Orphaned SABBs (docstatus=1 but no linked SLE) are intentionally excluded
+    # because ERPNext's own validator ignores them — including them would make the
+    # frontend show higher availability than the backend actually allows.
     bundle_rows = frappe.db.sql(
         """
         SELECT
-            sbb.item_code,
+            sle.item_code,
             sbe.batch_no,
             SUM(sbe.qty) AS qty
-        FROM `tabSerial and Batch Entry` sbe
-        INNER JOIN `tabSerial and Batch Bundle` sbb
-            ON sbb.name = sbe.parent
-        INNER JOIN `tabStock Ledger Entry` sle
-            ON sle.serial_and_batch_bundle = sbb.name
+        FROM `tabStock Ledger Entry` sle
+        INNER JOIN `tabSerial and Batch Entry` sbe
+            ON sbe.parent = sle.serial_and_batch_bundle
         WHERE
             sbe.batch_no IS NOT NULL
-            AND sbb.item_code IN %(item_codes)s
-            AND sbb.warehouse IN %(warehouses)s
             AND sle.is_cancelled = 0
-        GROUP BY sbb.item_code, sbe.batch_no
+            AND sle.item_code IN %(item_codes)s
+            AND sle.warehouse IN %(warehouses)s
+            AND sle.serial_and_batch_bundle IS NOT NULL
+            AND sle.serial_and_batch_bundle != ''
+        GROUP BY sle.item_code, sbe.batch_no
         """,
         {"item_codes": item_codes, "warehouses": warehouses},
         as_dict=True,
@@ -286,7 +290,7 @@ def _fetch_batches(warehouse: str, item_codes: Tuple[str, ...]):
         key = (row.item_code, row.batch_no)
         qty_map[key] = qty_map.get(key, 0) + flt(row.qty)
 
-    # Backward compatibility for ledgers created before Serial and Batch Bundle existed.
+    # Path 2 (legacy): direct batch_no on SLE (old-style, pre-SABB receipts).
     legacy_rows = frappe.db.sql(
         """
         SELECT
@@ -743,6 +747,123 @@ class ItemDetailAggregator:
         return result
 
 
+from frappe.utils.caching import redis_cache
+
+@frappe.whitelist()
+@redis_cache(ttl=30)  # Cache for 30 seconds to improve POS performance
+def get_live_batch_qty(item_code: str, warehouse: str):
+    """Fetch live batch quantities for a single item with short-term caching.
+    
+    Returns list of dicts with batch_no, batch_qty, expiry_date, etc.
+    Used by frontend to get fresh batch availability on-demand.
+    
+    CACHED for 30 seconds to improve POS performance during rapid item additions.
+    
+    CRITICAL: Uses ERPNext's get_batch_qty which correctly accounts for:
+    - Reserved stock in pending POS invoices
+    - Expired batches (excluded by default)
+    - Serial and Batch Bundle entries
+    This ensures frontend shows the same availability that backend validation will use.
+    """
+    if not item_code or not warehouse:
+        return []
+    
+    from erpnext.stock.doctype.batch.batch import get_batch_qty
+    
+    # Use ERPNext's get_batch_qty which handles reserved stock correctly
+    # This returns the same values that ERPNext's validation will check
+    batches = get_batch_qty(item_code=item_code, warehouse=warehouse)
+    
+    if not batches:
+        return []
+    
+    # get_batch_qty returns list of dicts with batch_no, qty, expiry_date
+    result = []
+    for batch in batches:
+        qty = batch.get("qty", 0)
+        if qty <= 0:
+            continue
+        
+        # Fetch additional batch metadata (price, manufacturing_date)
+        batch_doc = frappe.get_cached_value(
+            "Batch",
+            batch.get("batch_no"),
+            ["posa_batch_price", "manufacturing_date"],
+            as_dict=True,
+        )
+        
+        result.append({
+            "batch_no": batch.get("batch_no"),
+            "batch_qty": qty,
+            "expiry_date": batch.get("expiry_date"),
+            "batch_price": batch_doc.get("posa_batch_price") if batch_doc else None,
+            "manufacturing_date": batch_doc.get("manufacturing_date") if batch_doc else None,
+        })
+    
+    return result
+
+
+@frappe.whitelist()
+def debug_batch_stock(item_code: str, warehouse: str):
+    """Debug function to compare batch stock from different sources.
+    
+    Usage from bench console:
+        frappe.call('posawesome.posawesome.api.item_fetchers.debug_batch_stock', 
+                    item_code='MED-UCL-0041', warehouse='KORLE-BU RETAIL - UCL')
+    """
+    from erpnext.stock.doctype.batch.batch import get_batch_qty
+    from posawesome.posawesome.api.utilities import _get_live_batches_for_item
+    
+    result = {
+        "item_code": item_code,
+        "warehouse": warehouse,
+        "erpnext_batches": [],
+        "posawesome_batches": [],
+        "frontend_api_batches": [],
+    }
+    
+    # ERPNext's get_batch_qty
+    try:
+        erpnext_batches = get_batch_qty(item_code=item_code, warehouse=warehouse)
+        for b in erpnext_batches:
+            result["erpnext_batches"].append({
+                "batch_no": b.get("batch_no"),
+                "qty": b.get("qty"),
+                "expiry_date": str(b.get("expiry_date")) if b.get("expiry_date") else None,
+            })
+        result["erpnext_total"] = sum(b.get("qty", 0) for b in erpnext_batches)
+    except Exception as e:
+        result["erpnext_error"] = str(e)
+    
+    # POSAwesome's _get_live_batches_for_item
+    try:
+        posa_batches = _get_live_batches_for_item(item_code, warehouse)
+        for b in posa_batches:
+            result["posawesome_batches"].append({
+                "batch_no": b.get("batch_no"),
+                "available_qty": b.get("available_qty"),
+                "expiry_date": str(b.get("expiry_date")) if b.get("expiry_date") else None,
+            })
+        result["posawesome_total"] = sum(b.get("available_qty", 0) for b in posa_batches)
+    except Exception as e:
+        result["posawesome_error"] = str(e)
+    
+    # Frontend API (get_live_batch_qty)
+    try:
+        frontend_batches = get_live_batch_qty(item_code, warehouse)
+        for b in frontend_batches:
+            result["frontend_api_batches"].append({
+                "batch_no": b.get("batch_no"),
+                "batch_qty": b.get("batch_qty"),
+                "expiry_date": str(b.get("expiry_date")) if b.get("expiry_date") else None,
+            })
+        result["frontend_api_total"] = sum(b.get("batch_qty", 0) for b in frontend_batches)
+    except Exception as e:
+        result["frontend_api_error"] = str(e)
+    
+    return result
+
+
 __all__ = [
     "ItemDetailAggregator",
     "ItemLookupData",
@@ -755,4 +876,5 @@ __all__ = [
     "get_serials",
     "get_bom_costs",
     "merge_item_row",
+    "get_live_batch_qty",
 ]

@@ -5,7 +5,8 @@
 from __future__ import unicode_literals
 
 import frappe
-from frappe.utils import cstr, add_to_date, get_datetime
+from frappe.utils import cstr, add_to_date, get_datetime, flt
+from frappe import _
 from typing import List, Dict, Any
 import time
 import os
@@ -14,6 +15,7 @@ import json
 import subprocess
 
 from posawesome import __version__ as POS_AWESOME_APP_VERSION
+from erpnext.stock.doctype.batch.batch import get_batch_qty
 
 try:
     import psutil
@@ -142,23 +144,229 @@ def add_taxes_from_tax_template(item, parent_doc):
                 tax_row.db_insert()
 
 
+def _get_live_batches_for_item(item_code, warehouse):
+    """Return list of dicts with batch_no and available_qty, sorted FEFO.
+
+    ERPNext tracks batch stock in two ways:
+      1. Old style: sle.batch_no set directly on the SLE row.
+      2. New style: sle.serial_and_batch_bundle → tabSerial and Batch Bundle
+         → tabSerial and Batch Entry with batch_no + qty.
+
+    CRITICAL: We MUST use the exact same query logic as ERPNext's own
+    get_available_batches() (serial_and_batch_bundle.py) for Path 2.
+    That function joins SLE → Serial and Batch Entry.  If we bypass SLE and
+    query SABB directly we can include "orphaned" SABBs that ERPNext itself
+    ignores, leading to us allocating more qty than ERPNext will validate,
+    which causes BatchNegativeStockError on submission.
+    """
+    return frappe.db.sql(
+        """
+        SELECT
+            batch_no,
+            SUM(qty) AS available_qty,
+            MIN(expiry_date) AS expiry_date
+        FROM (
+            -- Path 1: direct batch_no on SLE (legacy / old-style receipts)
+            SELECT
+                sle.batch_no AS batch_no,
+                sle.actual_qty AS qty,
+                b.expiry_date AS expiry_date
+            FROM `tabStock Ledger Entry` sle
+            INNER JOIN `tabBatch` b ON b.name = sle.batch_no
+            WHERE sle.item_code = %(item_code)s
+              AND sle.warehouse = %(warehouse)s
+              AND sle.is_cancelled = 0
+              AND sle.batch_no IS NOT NULL AND sle.batch_no != ''
+              AND (sle.serial_and_batch_bundle IS NULL OR sle.serial_and_batch_bundle = '')
+              AND (b.expiry_date IS NULL OR b.expiry_date > CURDATE())
+
+            UNION ALL
+
+            -- Path 2: Serial and Batch Bundle (new-style) — joined via SLE
+            -- to stay in sync with ERPNext's own get_available_batches() logic.
+            -- Do NOT bypass the SLE join: orphaned SABBs (docstatus=1 but no SLE)
+            -- are intentionally excluded because ERPNext's validator ignores them too.
+            SELECT
+                sabbe.batch_no AS batch_no,
+                sabbe.qty AS qty,
+                b.expiry_date AS expiry_date
+            FROM `tabStock Ledger Entry` sle
+            INNER JOIN `tabSerial and Batch Entry` sabbe
+                ON sabbe.parent = sle.serial_and_batch_bundle
+            INNER JOIN `tabBatch` b ON b.name = sabbe.batch_no
+            WHERE sle.item_code = %(item_code)s
+              AND sle.warehouse = %(warehouse)s
+              AND sle.is_cancelled = 0
+              AND sle.serial_and_batch_bundle IS NOT NULL
+              AND sle.serial_and_batch_bundle != ''
+              AND (b.expiry_date IS NULL OR b.expiry_date > CURDATE())
+        ) combined
+        GROUP BY batch_no
+        HAVING SUM(qty) > 0
+        ORDER BY ISNULL(expiry_date), expiry_date ASC
+        """,
+        {"item_code": item_code, "warehouse": warehouse},
+        as_dict=True,
+    )
+
+
 def set_batch_nos_for_bundels(doc, warehouse_field, throw=False):
-    """Automatically select `batch_no` for outgoing items in item table"""
-    for d in doc.packed_items:
-        qty = d.get("stock_qty") or d.get("transfer_qty") or d.get("qty") or 0
+    """Re-allocate batch numbers using live stock at submission time.
+
+    The frontend assigns batches based on cached availability which may be stale
+    by the time Pay is clicked (other sales may have consumed stock). This function
+    checks live stock for each batch row and reallocates/splits rows as needed.
+
+    KEY FIX: We must check cross-row over-allocation. Multiple invoice rows can
+    share the same batch (e.g. after a frontend split that duplicated a batch).
+    A per-row check (live_qty >= row_qty) passes individually but the combined
+    demand across all rows can exceed live stock, causing BatchNegativeStockError.
+    We pre-compute total demand per (item, warehouse, batch) and reallocate all
+    rows for any batch that is over-committed.
+    """
+    # ------------------------------------------------------------------
+    # Phase 1: tally demand per (item_code, warehouse, batch_no)
+    # ------------------------------------------------------------------
+    demand: dict = {}   # (item_code, warehouse, batch_no) -> list of row objects
+    for d in list(doc.items):
+        qty = flt(d.get("qty") or 0)
+        warehouse = d.get(warehouse_field) or ""
+        if not (warehouse and qty > 0 and d.get("batch_no")):
+            continue
         has_batch_no = frappe.db.get_value("Item", d.item_code, "has_batch_no")
-        warehouse = d.get(warehouse_field, None)
-        if has_batch_no and warehouse and qty > 0:
-            if not d.batch_no:
-                d.batch_no = get_batch_no(d.item_code, warehouse, qty, throw, d.serial_no)
-            else:
-                batch_qty = get_batch_qty(batch_no=d.batch_no, warehouse=warehouse)
-                if flt(batch_qty, d.precision("qty")) < flt(qty, d.precision("qty")):
-                    frappe.throw(
-                        _(
-                            "Row #{0}: The batch {1} has only {2} qty. Please select another batch which has {3} qty available or split the row into multiple rows, to deliver/issue from multiple batches"
-                        ).format(d.idx, d.batch_no, batch_qty, qty)
-                    )
+        if not has_batch_no:
+            continue
+        key = (d.item_code, warehouse, d.batch_no)
+        demand.setdefault(key, []).append(d)
+
+    # ------------------------------------------------------------------
+    # Phase 2: for each batch, check if combined demand > live stock.
+    #          If so, reallocate ALL rows for that item/warehouse across
+    #          live batches in FEFO order.
+    # ------------------------------------------------------------------
+    rows_to_add = []  # list of (source_row_dict, batch_no, qty)
+
+    # Track which item+warehouse combos have already been fully reallocated
+    # so we don't process them twice.
+    reallocated: set = set()
+
+    for (item_code, warehouse, batch_no), rows in demand.items():
+        item_wh_key = (item_code, warehouse)
+        if item_wh_key in reallocated:
+            continue
+
+        # Sum total demand this invoice places on this specific batch
+        batch_demand = sum(flt(r.get("qty") or 0) for r in rows)
+        live_batch_qty = flt(get_batch_qty(batch_no=batch_no, warehouse=warehouse))
+
+        if live_batch_qty >= batch_demand:
+            # This batch has enough stock for all rows that use it — no action needed.
+            continue
+
+        # Over-allocated (or stale): reallocate ALL rows for this item+warehouse
+        # across all live batches in FEFO order.
+        reallocated.add(item_wh_key)
+
+        # Collect every row for this item+warehouse (regardless of batch)
+        all_rows_for_item = [
+            r for r in doc.items
+            if r.item_code == item_code
+            and (r.get(warehouse_field) or "") == warehouse
+            and flt(r.get("qty") or 0) > 0
+            and r.get("batch_no")
+        ]
+
+        total_demand = sum(flt(r.get("qty") or 0) for r in all_rows_for_item)
+
+        live_batches = _get_live_batches_for_item(item_code, warehouse)
+        live_stock_map = {b.batch_no: flt(b.available_qty) for b in live_batches}
+        total_available = sum(live_stock_map.values())
+
+        if total_available <= 0:
+            frappe.throw(
+                _("Insufficient live stock for item {0} in {1}. No stock available in any batch.").format(
+                    item_code, warehouse
+                )
+            )
+
+        # Build new allocations for the total demand across FEFO-sorted batches
+        remaining = total_demand
+        new_allocations = []  # list of (batch_no, qty)
+        for batch in live_batches:
+            if remaining <= 0:
+                break
+            avail = flt(batch.available_qty)
+            if avail <= 0:
+                continue
+            take = min(avail, remaining)
+            new_allocations.append((batch.batch_no, take))
+            remaining -= take
+
+        if remaining > 0:
+            # Partial stock — cap total to what's available and warn
+            frappe.msgprint(
+                _(
+                    "Item {0} in {1}: Only {2} units available across all batches, "
+                    "but {3} were requested. Invoice adjusted to available quantity."
+                ).format(item_code, warehouse, total_available, total_demand),
+                alert=True,
+            )
+
+        # Flatten new_allocations into a list long enough to cover all rows.
+        # Strategy: fill each existing row greedily from allocations in order.
+        alloc_iter = list(new_allocations)  # copy to consume
+        alloc_idx = 0
+        alloc_remaining_in_slot = alloc_iter[0][1] if alloc_iter else 0
+
+        for row in all_rows_for_item:
+            row_demand = flt(row.get("qty") or 0)
+            row_new_allocs = []  # allocations for this specific row
+
+            while row_demand > 0 and alloc_idx < len(alloc_iter):
+                b_no, _ = alloc_iter[alloc_idx]
+                take = min(alloc_remaining_in_slot, row_demand)
+                if take > 0:
+                    row_new_allocs.append((b_no, take))
+                    row_demand -= take
+                    alloc_remaining_in_slot -= take
+
+                if alloc_remaining_in_slot <= 0:
+                    alloc_idx += 1
+                    if alloc_idx < len(alloc_iter):
+                        alloc_remaining_in_slot = alloc_iter[alloc_idx][1]
+
+            if not row_new_allocs:
+                # No stock left for this row — remove it (set qty to 0 and mark)
+                row.qty = 0
+                continue
+
+            # Apply first allocation to existing row
+            first_batch_no, first_qty = row_new_allocs[0]
+            row.batch_no = first_batch_no
+            row.qty = first_qty
+            if row.get("stock_qty") is not None:
+                row.stock_qty = first_qty * flt(row.get("conversion_factor") or 1)
+            row.amount = flt(first_qty) * flt(row.get("rate") or 0)
+
+            # Extra allocations become new rows
+            for extra_batch_no, extra_qty in row_new_allocs[1:]:
+                rows_to_add.append((row, extra_batch_no, extra_qty))
+
+    # ------------------------------------------------------------------
+    # Phase 3: append split rows and remove any zero-qty rows
+    # ------------------------------------------------------------------
+    for source_row, batch_no, qty in rows_to_add:
+        new_row = doc.append("items", {})
+        new_row.update(source_row.as_dict())
+        new_row.name = None
+        new_row.batch_no = batch_no
+        new_row.qty = qty
+        if new_row.get("stock_qty") is not None:
+            new_row.stock_qty = qty * flt(new_row.get("conversion_factor") or 1)
+        new_row.amount = flt(qty) * flt(new_row.get("rate") or 0)
+
+    # Remove any rows zeroed out due to insufficient stock
+    doc.items = [r for r in doc.items if flt(r.get("qty") or 0) != 0]
 
 
 def get_company_domain(company):

@@ -120,15 +120,76 @@ export function useBatchSerial() {
 	};
 
 	// Calculate batch availability and sort according to FIFO/Expiry
-	const getBatchAvailability = (item: any, context: any) => {
+	const getBatchAvailability = async (item: any, context: any) => {
+		// Fetch fresh batch quantities from server to avoid stale cache
+		let source_batches = Array.isArray(item.batch_no_data)
+			? item.batch_no_data
+			: [];
+		
+		const warehouse = context.warehouse || context.pos_profile?.warehouse;
+		const cached_total = source_batches.reduce((sum, b) => sum + (Number(b.batch_qty || b.available_qty) || 0), 0);
+		console.log("[POS BatchFlow] getBatchAvailability START", {
+			item_code: item.item_code,
+			warehouse,
+			has_context_warehouse: !!context.warehouse,
+			has_pos_profile_warehouse: !!context.pos_profile?.warehouse,
+			cached_batches: source_batches.length,
+			cached_total,
+		});
+		
+		if (item.item_code && warehouse) {
+			try {
+				console.log("[POS BatchFlow] Calling get_live_batch_qty API...");
+				const response = await frappe.call({
+					method: "posawesome.posawesome.api.item_fetchers.get_live_batch_qty",
+					args: {
+						item_code: item.item_code,
+						warehouse: warehouse,
+					},
+					freeze: false,
+				});
+				console.log("[POS BatchFlow] API response received", {
+					has_message: !!response?.message,
+					is_array: Array.isArray(response?.message),
+					batch_count: response?.message?.length,
+				});
+				if (response?.message && Array.isArray(response.message)) {
+					source_batches = response.message;
+					const fresh_total = source_batches.reduce((sum, b) => sum + (Number(b.batch_qty) || 0), 0);
+					console.log("[POS BatchFlow] Using FRESH batch data from API", {
+						item_code: item.item_code,
+						batches: source_batches.length,
+						total_qty: fresh_total,
+						first_batch: source_batches[0]?.batch_no,
+					});
+					// Update item's batch_no_data with fresh data
+					item.batch_no_data = source_batches;
+				} else {
+					console.warn("[POS BatchFlow] API returned invalid data, using cached", {
+						response,
+					});
+				}
+			} catch (error) {
+				console.error("[POS BatchFlow] API call FAILED, using cached data", {
+					error,
+					item_code: item.item_code,
+					warehouse,
+				});
+				// Fall back to cached data if API fails
+			}
+		} else {
+			console.warn("[POS BatchFlow] Missing item_code or warehouse, using cached data", {
+				has_item_code: !!item.item_code,
+				warehouse,
+			});
+		}
+		
 		const existing_items = context.items.filter(
 			(element) =>
 				element.item_code == item.item_code &&
 				element.posa_row_id != item.posa_row_id,
 		);
-		const source_batches = Array.isArray(item.batch_no_data)
-			? item.batch_no_data
-			: [];
+		
 		let normalized_batch_data: any[] = source_batches
 			.map((batch, index) => {
 				const baseQty =
@@ -186,6 +247,7 @@ export function useBatchSerial() {
 				return aExpired ? 1 : -1;
 			}
 
+			// FIFO: Sort by expiry date (earliest first)
 			if (a.expiry_date && b.expiry_date) {
 				return (
 					new Date(a.expiry_date).getTime() -
@@ -230,14 +292,14 @@ export function useBatchSerial() {
 	};
 
 	// Set batch number for an item (and update batch data)
-	const setBatchQty = (
+	const setBatchQty = async (
 		item: any,
 		value: any,
 		update = true,
 		context: any,
 	) => {
 		const flt = context.flt || ((v: unknown) => Number(v));
-		const normalized_batch_data: any[] = getBatchAvailability(
+		const normalized_batch_data: any[] = await getBatchAvailability(
 			item,
 			context,
 		);

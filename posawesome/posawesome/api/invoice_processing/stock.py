@@ -147,6 +147,7 @@ def _collect_stock_errors(items, pos_profile=None, include_warnings=False):
 
         available = stock_map.get((item_code, warehouse, batch_no), 0.0)
         requested = flt(d.get("requested_qty"))
+        
         if requested > available:
             errors.append(
                 {
@@ -173,6 +174,9 @@ def _validate_stock_on_invoice(invoice_doc):
     items_to_check = [d.as_dict() for d in invoice_doc.items]
     if hasattr(invoice_doc, "packed_items"):
         items_to_check.extend([d.as_dict() for d in invoice_doc.packed_items])
+    
+    # Auto-reconcile unbatched stock before validation
+    warehouse_items = {}
     errors = _collect_stock_errors(
         items_to_check,
         pos_profile=invoice_doc.pos_profile,

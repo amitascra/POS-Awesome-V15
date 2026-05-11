@@ -113,6 +113,12 @@ export function useInvoiceItems(invoiceType: Ref<string>) {
 			required: false,
 		},
 		{
+			title: __("Batch"),
+			key: "batch",
+			align: "center",
+			required: true,
+		},
+		{
 			title: __("Actions"),
 			key: "actions",
 			align: "center",

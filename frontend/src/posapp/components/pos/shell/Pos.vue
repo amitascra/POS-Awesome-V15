@@ -420,6 +420,28 @@ export default {
 			uiStore.setActiveView("payment");
 		};
 		const triggerInvoicePay = () => {
+			// Check if any items need batch splitting before allowing payment
+			const itemsNeedingSplit = invoiceStore.items.filter((item) => {
+				if (!item.has_batch_no || !item.batch_no) return false;
+				const qty = parseFloat(item.qty) || 0;
+				const batchQty = parseFloat(item.actual_batch_qty);
+				return qty > batchQty || !batchQty || batchQty <= 0;
+			});
+
+			if (itemsNeedingSplit.length > 0) {
+				// Show alert for items needing batch split
+				const itemNames = itemsNeedingSplit.map((item) => item.item_name).join("<br>");
+				frappe.msgprint({
+					title: __("Batch Splitting Required"),
+					indicator: "orange",
+					message: __(
+						"{0} item(s) need batch splitting before payment:<br><br>{1}<br><br>Please split the batches by clicking the split icon next to each item.",
+						[itemsNeedingSplit.length, itemNames]
+					),
+				});
+				return;
+			}
+
 			if (typeof invoicePanel.value?.handleShowPaymentRequest === "function") {
 				invoicePanel.value.handleShowPaymentRequest();
 				return;
