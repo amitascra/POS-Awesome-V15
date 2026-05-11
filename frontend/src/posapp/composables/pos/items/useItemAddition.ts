@@ -435,6 +435,12 @@ export function useItemAddition() {
 					// For manual split (new_line: true), use cached batch data to see all batches
 					// For auto-split (new_line: false), use API data to respect reservations
 					let batches;
+					logBatchFlow("Batch split triggered - checking data source", {
+						item_code: new_item.item_code,
+						new_line: context.new_line,
+						has_batch_no_data: !!item.batch_no_data,
+						batch_no_data_length: item.batch_no_data?.length || 0,
+					});
 					if (context.new_line && item.batch_no_data && item.batch_no_data.length > 0) {
 						// Manual split button clicked - use cached data to see all batches
 						batches = item.batch_no_data.map((b: any) => ({
@@ -445,6 +451,7 @@ export function useItemAddition() {
 						logBatchFlow("Using cached batch data for manual split", {
 							item_code: new_item.item_code,
 							cached_batches: batches.length,
+							cached_total: batches.reduce((sum, b) => sum + b.available_qty, 0),
 						});
 					} else {
 						// Auto-split - use API data to respect reservations
