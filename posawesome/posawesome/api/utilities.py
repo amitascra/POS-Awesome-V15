@@ -195,40 +195,10 @@ def set_batch_nos_for_bundels(doc, warehouse_field, throw=False):
     We pre-compute total demand per (item, warehouse, batch) and reallocate all
     rows for any batch that is over-committed.
     
-    CRITICAL: If frontend has already split an item across multiple batches,
-    skip reallocation entirely. The backend should only reallocate if frontend
-    sent a single row with insufficient batch qty.
+    NOTE: For Sales Invoice, the CustomSalesInvoice.use_auto_batch_bundle_for_overdrawn_rows
+    handles batch splitting in before_validate(), so this function is not called for SI.
+    This function is still used for other doctypes like POS Invoice.
     """
-    # ------------------------------------------------------------------
-    # Phase 0: Check if frontend has already done batch splitting
-    # ------------------------------------------------------------------
-    # Group items by (item_code, warehouse) and count unique batches per group
-    item_warehouse_batches = {}
-    for d in doc.items:
-        qty = flt(d.get("qty") or 0)
-        warehouse = d.get(warehouse_field) or ""
-        if not (warehouse and qty > 0 and d.get("batch_no")):
-            continue
-        has_batch_no = frappe.db.get_value("Item", d.item_code, "has_batch_no")
-        if not has_batch_no:
-            continue
-        
-        key = (d.item_code, warehouse)
-        if key not in item_warehouse_batches:
-            item_warehouse_batches[key] = set()
-        item_warehouse_batches[key].add(d.get("batch_no"))
-    
-    # If any item has multiple batches assigned, skip reallocation
-    # (frontend has already split, respect that)
-    has_frontend_splits = any(len(batches) > 1 for batches in item_warehouse_batches.values())
-    if has_frontend_splits:
-        frappe.log_error(
-            title="Frontend Batch Split Detected",
-            message=f"[BATCH DEBUG] Frontend has split batches across multiple rows. "
-                    f"Skipping backend reallocation to respect frontend assignments."
-        )
-        return
-    
     # ------------------------------------------------------------------
     # Phase 1: tally demand per (item_code, warehouse, batch_no)
     # ------------------------------------------------------------------
