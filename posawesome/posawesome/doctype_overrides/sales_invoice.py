@@ -164,7 +164,23 @@ def get_selected_batch_qty(row):
 
 def make_auto_batch_bundle(doc, row, required_qty, consumed_by_batch=None):
 	"""Create Serial & Batch Bundle with auto-allocated batches."""
-	batches = get_batch_allocations(row, required_qty, consumed_by_batch=consumed_by_batch)
+	# If row already has a specific batch assigned by frontend, use only that batch
+	if row.get("batch_no"):
+		batch_no = row.get("batch_no")
+		available_qty = get_sbb_safe_batch_qty(row, batch_no)
+		consumed = flt((consumed_by_batch or {}).get(batch_no, 0))
+		net_available = max(0, available_qty - consumed)
+		
+		# If the assigned batch has enough quantity, use it exclusively
+		if net_available >= required_qty:
+			batches = frappe._dict({batch_no: required_qty})
+		else:
+			# Batch insufficient - recalculate across all batches
+			batches = get_batch_allocations(row, required_qty, consumed_by_batch=consumed_by_batch)
+	else:
+		# No batch assigned - auto-allocate across available batches
+		batches = get_batch_allocations(row, required_qty, consumed_by_batch=consumed_by_batch)
+	
 	bundle = CustomSerialBatchCreation(
 		{
 			"item_code": row.item_code,
