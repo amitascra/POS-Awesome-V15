@@ -350,13 +350,26 @@ const performBatchSplit = (item: any, newQty: number) => {
 		setBatchQty: props.setBatchQty,
 		set_batch_qty: props.setBatchQty,
 		new_line: true, // prevent merging with existing rows
+		warehouse: item.warehouse || props.pos_profile?.warehouse,
 	};
+	// Create a clean item object without batch data to trigger auto-split
 	const itemToReAdd = {
-		...item,
+		item_code: item.item_code,
+		item_name: item.item_name,
 		qty: newQty,
+		uom: item.uom,
+		warehouse: item.warehouse,
+		// Explicitly clear all batch-related fields
 		batch_no: null,
 		to_set_batch_no: null,
 		posa_row_id: null,
+		actual_batch_qty: null,
+		// Keep essential fields
+		has_batch_no: item.has_batch_no,
+		has_serial_no: item.has_serial_no,
+		price_list_rate: item.price_list_rate,
+		rate: item.rate,
+		discount_percentage: item.discount_percentage,
 	};
 	props.removeItem(item);
 	addItem(itemToReAdd, context);
