@@ -68,7 +68,6 @@
 					@toggle-expand="handleToggleExpand(internalItem, toggleExpand)"
 					@open-details-dialog="openItemDetailsDialog"
 					@remove-item="removeItem"
-					@batch-split="handleBatchSplit"
 					@change-batch="handleBatchChange"
 				/>
 			</template>
@@ -147,29 +146,6 @@
 			@qty-change="handleQtyChange"
 		/>
 
-		<!-- Batch Split Confirmation Dialog -->
-		<v-dialog v-model="batchSplitConfirmDialog" max-width="500">
-			<v-card>
-				<v-card-title class="text-h6">{{ __("Batch Split Required") }}</v-card-title>
-				<v-card-text>
-					<p v-if="pendingSplitItem">
-						{{ __("Only") }} <strong>{{ formatFloat(pendingSplitItem.actual_batch_qty || 0) }}</strong>
-						{{ __("units available in Batch") }}
-						<strong>{{ pendingSplitItem.batch_no }}</strong>.
-					</p>
-					<p v-if="pendingSplitItem && pendingSplitQty">
-						{{ __("Split remaining") }}
-						<strong>{{ formatFloat(pendingSplitQty - (pendingSplitItem.actual_batch_qty || 0)) }}</strong>
-						{{ __("units across other available batches?") }}
-					</p>
-				</v-card-text>
-				<v-card-actions>
-					<v-spacer></v-spacer>
-					<v-btn variant="text" @click="cancelBatchSplit">{{ __("Cancel") }}</v-btn>
-					<v-btn color="warning" variant="flat" @click="confirmBatchSplit">{{ __("Split") }}</v-btn>
-				</v-card-actions>
-			</v-card>
-		</v-dialog>
 	</div>
 </template>
 
@@ -363,10 +339,6 @@ const handleMinusClick = (item: any) => {
 
 const { addItem, removeItem: removeItemFromStore } = useItemAddition();
 
-// Batch split confirmation state
-const batchSplitConfirmDialog = ref(false);
-const pendingSplitItem = ref<any>(null);
-const pendingSplitQty = ref<number>(0);
 
 const performBatchSplit = (item: any, newQty: number) => {
 	const context = {
@@ -393,7 +365,7 @@ const performBatchSplit = (item: any, newQty: number) => {
 
 const handleQtyUpdate = (item: any, newQty: any) => {
 	// For batched items: if new qty exceeds current batch availability,
-	// show confirmation dialog before splitting
+	// auto-split without confirmation (frontend-first validation handles this)
 	if (
 		item?.has_batch_no &&
 		item?.batch_no &&
@@ -403,10 +375,8 @@ const handleQtyUpdate = (item: any, newQty: any) => {
 		const parsedQty = parseFloat(newQty) || 0;
 		const batchAvail = Number(item.actual_batch_qty) || 0;
 		if (parsedQty > batchAvail && batchAvail > 0) {
-			// Show confirmation dialog
-			pendingSplitItem.value = item;
-			pendingSplitQty.value = parsedQty;
-			batchSplitConfirmDialog.value = true;
+			// Auto-split: remove item and re-add with new qty
+			performBatchSplit(item, parsedQty);
 			return;
 		}
 	}
@@ -414,26 +384,7 @@ const handleQtyUpdate = (item: any, newQty: any) => {
 	eventBus?.emit("recalculate_return_discount", { defer: true });
 };
 
-const confirmBatchSplit = () => {
-	if (pendingSplitItem.value && pendingSplitQty.value) {
-		performBatchSplit(pendingSplitItem.value, pendingSplitQty.value);
-	}
-	batchSplitConfirmDialog.value = false;
-	pendingSplitItem.value = null;
-	pendingSplitQty.value = 0;
-};
 
-const cancelBatchSplit = () => {
-	batchSplitConfirmDialog.value = false;
-	pendingSplitItem.value = null;
-	pendingSplitQty.value = 0;
-};
-
-const handleBatchSplit = (item: any) => {
-	// Manual batch split button clicked - split immediately without confirmation
-	const currentQty = parseFloat(item.qty) || 0;
-	performBatchSplit(item, currentQty);
-};
 
 const handleBatchChange = ({ item, batch }: { item: any; batch: string }) => {
 	// Handle batch selection change from the dropdown

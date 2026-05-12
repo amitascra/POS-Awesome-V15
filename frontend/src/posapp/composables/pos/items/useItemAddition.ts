@@ -402,9 +402,8 @@ export function useItemAddition() {
 					Number(new_item.qty || 0),
 				);
 				
-				// Check if we should split across batches BEFORE assigning manual batch
-				// This prevents manual batch selection from blocking auto-splitting
-				// Split ONLY if: has batch, no batch assigned yet, AND auto-set enabled AND qty exceeds single batch availability
+				// FRONTEND-FIRST VALIDATION: Check total availability before batch allocation
+				// This prevents unnecessary backend calls and provides instant feedback
 				let shouldAllocateAcrossBatches = false;
 				
 				if (
@@ -413,18 +412,53 @@ export function useItemAddition() {
 					!item.to_set_batch_no && // Don't split if user manually selected a batch
 					shouldAutoSetBatch(context, new_item)
 				) {
-					// Check if qty exceeds what a single batch can handle
+					// Get batch availability (uses cached data - no API call)
 					const batches = await getBatchAvailabilityForItem(context, new_item);
 					const usable_batches = batches.filter((b) => b.available_qty > 0);
+					
+					// Calculate total available across all batches
+					const totalAvailable = usable_batches.reduce(
+						(sum, b) => sum + (Number(b.available_qty) || 0),
+						0
+					);
+					
+					logBatchFlow("Batch availability check", {
+						item_code: new_item.item_code,
+						requested_qty: requestedQtyForBatching,
+						total_available: totalAvailable,
+						batch_count: usable_batches.length,
+					});
+					
+					// TIER 1: Frontend-only validation - check if qty exceeds total available
+					if (requestedQtyForBatching > totalAvailable) {
+						// Show error toast and stop - don't add item
+						const warehouse = new_item.warehouse || context.pos_profile?.warehouse || "";
+						toastStore.show({
+							color: "error",
+							detail: __(
+								"Item {0}: Only {1} units available in {2}",
+								[new_item.item_code, totalAvailable.toFixed(2), warehouse]
+							),
+							title: __("Insufficient Stock"),
+						});
+						logBatchFlow("Item rejected: qty exceeds total available", {
+							item_code: new_item.item_code,
+							requested: requestedQtyForBatching,
+							available: totalAvailable,
+						});
+						return; // Stop - don't add item to cart
+					}
+					
 					if (usable_batches.length > 0) {
 						const first_batch_qty = usable_batches[0]?.available_qty || 0;
-						// Split ONLY if requested qty exceeds first batch availability
+						// Auto-split if requested qty exceeds first batch availability
 						if (requestedQtyForBatching > first_batch_qty) {
 							shouldAllocateAcrossBatches = true;
 							logBatchFlow("Auto-splitting triggered: qty exceeds single batch availability", {
 								item_code: new_item.item_code,
 								requested_qty: requestedQtyForBatching,
 								first_batch_qty: first_batch_qty,
+								total_available: totalAvailable,
 							});
 						}
 					}

@@ -24,7 +24,7 @@
 						</v-chip>
 						<v-chip
 							v-if="item.has_batch_no && item.batch_no"
-							:color="needsBatchSplit ? 'warning' : 'info'"
+							color="info"
 							size="x-small"
 							variant="tonal"
 						>
@@ -392,22 +392,6 @@
 
 			<!-- Actions -->
 			<td v-else-if="column.key === 'actions'" class="text-center" :data-column-key="'actions'">
-				<v-tooltip v-if="item.has_batch_no && item.batch_no && !isReturnInvoice" location="bottom">
-					<template #activator="{ props }">
-						<v-btn
-							v-bind="props"
-							size="small"
-							variant="flat"
-							:color="needsBatchSplit ? 'warning' : 'primary'"
-							class="mr-1"
-							@click.stop="$emit('batch-split', item)"
-							:aria-label="__('Split across batches')"
-						>
-							<v-icon size="small">mdi-call-split</v-icon>
-						</v-btn>
-					</template>
-					<span>{{ __("Split across available batches") }}</span>
-				</v-tooltip>
 				<v-btn
 					:disabled="!!item.posa_is_replace"
 					size="small"
@@ -486,7 +470,6 @@ const emit = defineEmits([
 	"toggle-offer",
 	"toggle-expand",
 	"remove-item",
-	"batch-split",
 	"change-batch",
 ]);
 
@@ -545,15 +528,6 @@ const memoDeps = computed(() => {
 
 const qtyLength = computed(() => String(Math.abs(props.item.qty || 0)).replace(".", "").length);
 
-const needsBatchSplit = computed(() => {
-	if (!props.item.has_batch_no || !props.item.batch_no || props.isReturnInvoice) {
-		return false;
-	}
-	const qty = parseFloat(props.item.qty) || 0;
-	const batchQty = parseFloat(props.item.actual_batch_qty);
-	// Show split button if qty exceeds batch availability OR batch qty is unknown/zero
-	return qty > batchQty || !batchQty || batchQty <= 0;
-});
 
 const disableDecrement = computed(
 	() =>
