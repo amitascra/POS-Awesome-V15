@@ -147,67 +147,35 @@ def add_taxes_from_tax_template(item, parent_doc):
 def _get_live_batches_for_item(item_code, warehouse):
     """Return list of dicts with batch_no and available_qty, sorted FEFO.
 
-    ERPNext tracks batch stock in two ways:
-      1. Old style: sle.batch_no set directly on the SLE row.
-      2. New style: sle.serial_and_batch_bundle → tabSerial and Batch Bundle
-         → tabSerial and Batch Entry with batch_no + qty.
+    Uses ERPNext's get_batch_qty which correctly handles:
+    - Reserved stock in pending POS invoices
+    - Expired batches (excluded by default)
+    - Both legacy and bundle-based batch tracking
+    - Same logic as ERPNext's validation
 
-    CRITICAL: We MUST use the exact same query logic as ERPNext's own
-    get_available_batches() (serial_and_batch_bundle.py) for Path 2.
-    That function joins SLE → Serial and Batch Entry.  If we bypass SLE and
-    query SABB directly we can include "orphaned" SABBs that ERPNext itself
-    ignores, leading to us allocating more qty than ERPNext will validate,
-    which causes BatchNegativeStockError on submission.
+    This ensures backend allocation matches what ERPNext will validate on submission.
     """
-    return frappe.db.sql(
-        """
-        SELECT
-            batch_no,
-            SUM(qty) AS available_qty,
-            MIN(expiry_date) AS expiry_date
-        FROM (
-            -- Path 1: direct batch_no on SLE (legacy / old-style receipts)
-            SELECT
-                sle.batch_no AS batch_no,
-                sle.actual_qty AS qty,
-                b.expiry_date AS expiry_date
-            FROM `tabStock Ledger Entry` sle
-            INNER JOIN `tabBatch` b ON b.name = sle.batch_no
-            WHERE sle.item_code = %(item_code)s
-              AND sle.warehouse = %(warehouse)s
-              AND sle.is_cancelled = 0
-              AND sle.batch_no IS NOT NULL AND sle.batch_no != ''
-              AND (sle.serial_and_batch_bundle IS NULL OR sle.serial_and_batch_bundle = '')
-              AND (b.expiry_date IS NULL OR b.expiry_date > CURDATE())
+    from erpnext.stock.doctype.batch.batch import get_batch_qty
 
-            UNION ALL
+    batches = get_batch_qty(item_code=item_code, warehouse=warehouse)
 
-            -- Path 2: Serial and Batch Bundle (new-style) — joined via SLE
-            -- to stay in sync with ERPNext's own get_available_batches() logic.
-            -- Do NOT bypass the SLE join: orphaned SABBs (docstatus=1 but no SLE)
-            -- are intentionally excluded because ERPNext's validator ignores them too.
-            SELECT
-                sabbe.batch_no AS batch_no,
-                sabbe.qty AS qty,
-                b.expiry_date AS expiry_date
-            FROM `tabStock Ledger Entry` sle
-            INNER JOIN `tabSerial and Batch Entry` sabbe
-                ON sabbe.parent = sle.serial_and_batch_bundle
-            INNER JOIN `tabBatch` b ON b.name = sabbe.batch_no
-            WHERE sle.item_code = %(item_code)s
-              AND sle.warehouse = %(warehouse)s
-              AND sle.is_cancelled = 0
-              AND sle.serial_and_batch_bundle IS NOT NULL
-              AND sle.serial_and_batch_bundle != ''
-              AND (b.expiry_date IS NULL OR b.expiry_date > CURDATE())
-        ) combined
-        GROUP BY batch_no
-        HAVING SUM(qty) > 0
-        ORDER BY ISNULL(expiry_date), expiry_date ASC
-        """,
-        {"item_code": item_code, "warehouse": warehouse},
-        as_dict=True,
-    )
+    if not batches:
+        return []
+
+    # Convert to POSAwesome's expected format
+    result = []
+    for batch in batches:
+        qty = batch.get("qty", 0)
+        if qty <= 0:
+            continue
+
+        result.append({
+            "batch_no": batch.get("batch_no"),
+            "available_qty": qty,
+            "expiry_date": batch.get("expiry_date"),
+        })
+
+    return result
 
 
 def set_batch_nos_for_bundels(doc, warehouse_field, throw=False):
