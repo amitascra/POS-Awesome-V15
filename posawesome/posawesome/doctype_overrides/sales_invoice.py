@@ -75,8 +75,8 @@ class CustomSalesInvoice(SalesInvoice):
 		consumed_in_doc = {}
 
 		frappe.log_error(
-			f"[BATCH DEBUG] Starting batch bundle creation for invoice {self.name}",
-			title="Batch Bundle Start"
+			title="Batch Bundle Start",
+			message=f"[BATCH DEBUG] Starting batch bundle creation for invoice {self.name}"
 		)
 
 		for row in self.items:
@@ -93,15 +93,15 @@ class CustomSalesInvoice(SalesInvoice):
 			required_qty = flt(row.stock_qty or row.qty)
 			
 			frappe.log_error(
-				f"[BATCH DEBUG] Processing row {row.name}:\n"
-				f"  item_code: {row.item_code}\n"
-				f"  warehouse: {row.warehouse}\n"
-				f"  batch_no: {batch_no}\n"
-				f"  required_qty: {required_qty}\n"
-				f"  already_consumed: {already}\n"
-				f"  row.qty: {row.qty}\n"
-				f"  row.stock_qty: {row.stock_qty}",
-				title=f"Batch Row {row.name}"
+				title=f"Batch Row {row.name}",
+				message=f"[BATCH DEBUG] Processing row {row.name}:\n"
+					f"  item_code: {row.item_code}\n"
+					f"  warehouse: {row.warehouse}\n"
+					f"  batch_no: {batch_no}\n"
+					f"  required_qty: {required_qty}\n"
+					f"  already_consumed: {already}\n"
+					f"  row.qty: {row.qty}\n"
+					f"  row.stock_qty: {row.stock_qty}"
 			)
 			# Always create bundle for rows with batch_no to preserve frontend assignments
 			consumed_for_row_item_wh = {
@@ -111,8 +111,8 @@ class CustomSalesInvoice(SalesInvoice):
 			}
 			
 			frappe.log_error(
-				f"[BATCH DEBUG] Consumed batches for {row.item_code}: {consumed_for_row_item_wh}",
-				title=f"Consumed Batches {row.name}"
+				title=f"Consumed Batches {row.name}",
+				message=f"[BATCH DEBUG] Consumed batches for {row.item_code}: {consumed_for_row_item_wh}"
 			)
 			
 			bundle, allocations = make_auto_batch_bundle(
@@ -120,8 +120,8 @@ class CustomSalesInvoice(SalesInvoice):
 			)
 			if not bundle:
 				frappe.log_error(
-					f"[BATCH DEBUG] Bundle creation FAILED for row {row.name}",
-					title=f"Bundle Failed {row.name}"
+					title=f"Bundle Failed {row.name}",
+					message=f"[BATCH DEBUG] Bundle creation FAILED for row {row.name}"
 				)
 				frappe.throw(
 					_(
@@ -136,10 +136,10 @@ class CustomSalesInvoice(SalesInvoice):
 				)
 
 			frappe.log_error(
-				f"[BATCH DEBUG] Bundle created: {bundle.name}\n"
-				f"  Allocations: {allocations}\n"
-				f"  Total allocated: {sum(flt(q) for q in (allocations or {}).values())}",
-				title=f"Bundle Created {row.name}"
+				title=f"Bundle Created {row.name}",
+				message=f"[BATCH DEBUG] Bundle created: {bundle.name}\n"
+					f"  Allocations: {allocations}\n"
+					f"  Total allocated: {sum(flt(q) for q in (allocations or {}).values())}"
 			)
 
 			row.serial_and_batch_bundle = bundle.name
@@ -152,8 +152,8 @@ class CustomSalesInvoice(SalesInvoice):
 				consumed_in_doc[k] = flt(consumed_in_doc.get(k, 0)) + flt(qty)
 				
 			frappe.log_error(
-				f"[BATCH DEBUG] Updated consumption tracking: {consumed_in_doc}",
-				title="Consumption Updated"
+				title="Consumption Updated",
+				message=f"[BATCH DEBUG] Updated consumption tracking: {consumed_in_doc}"
 			)
 
 	def fetch_batch_expiry_for_all_items(self):
@@ -200,13 +200,13 @@ def get_selected_batch_qty(row):
 def make_auto_batch_bundle(doc, row, required_qty, consumed_by_batch=None):
 	"""Create Serial & Batch Bundle with auto-allocated batches."""
 	frappe.log_error(
-		f"[BATCH DEBUG] make_auto_batch_bundle called:\n"
-		f"  item_code: {row.item_code}\n"
-		f"  warehouse: {row.warehouse}\n"
-		f"  batch_no: {row.get('batch_no')}\n"
-		f"  required_qty: {required_qty}\n"
-		f"  consumed_by_batch: {consumed_by_batch}",
-		title="make_auto_batch_bundle"
+		title="make_auto_batch_bundle",
+		message=f"[BATCH DEBUG] make_auto_batch_bundle called:\n"
+			f"  item_code: {row.item_code}\n"
+			f"  warehouse: {row.warehouse}\n"
+			f"  batch_no: {row.get('batch_no')}\n"
+			f"  required_qty: {required_qty}\n"
+			f"  consumed_by_batch: {consumed_by_batch}"
 	)
 	
 	# If row already has a specific batch assigned by frontend, use only that batch
@@ -217,40 +217,40 @@ def make_auto_batch_bundle(doc, row, required_qty, consumed_by_batch=None):
 		net_available = max(0, available_qty - consumed)
 		
 		frappe.log_error(
-			f"[BATCH DEBUG] Batch assigned: {batch_no}\n"
-			f"  available_qty: {available_qty}\n"
-			f"  consumed: {consumed}\n"
-			f"  net_available: {net_available}\n"
-			f"  required_qty: {required_qty}",
-			title=f"Batch Check {batch_no}"
+			title=f"Batch Check {batch_no}",
+			message=f"[BATCH DEBUG] Batch assigned: {batch_no}\n"
+				f"  available_qty: {available_qty}\n"
+				f"  consumed: {consumed}\n"
+				f"  net_available: {net_available}\n"
+				f"  required_qty: {required_qty}"
 		)
 		
 		# If the assigned batch has enough quantity, use it exclusively
 		if net_available >= required_qty:
 			batches = frappe._dict({batch_no: required_qty})
 			frappe.log_error(
-				f"[BATCH DEBUG] Using assigned batch exclusively: {batches}",
-				title="Using Assigned Batch"
+				title="Using Assigned Batch",
+				message=f"[BATCH DEBUG] Using assigned batch exclusively: {batches}"
 			)
 		else:
 			# Batch insufficient - recalculate across all batches
 			frappe.log_error(
-				f"[BATCH DEBUG] Assigned batch insufficient, recalculating",
-				title="Recalculating Batches"
+				title="Recalculating Batches",
+				message="[BATCH DEBUG] Assigned batch insufficient, recalculating"
 			)
 			batches = get_batch_allocations(row, required_qty, consumed_by_batch=consumed_by_batch)
 	else:
 		# No batch assigned - auto-allocate across available batches
 		frappe.log_error(
-			f"[BATCH DEBUG] No batch assigned, auto-allocating",
-			title="Auto-allocating Batches"
+			title="Auto-allocating Batches",
+			message="[BATCH DEBUG] No batch assigned, auto-allocating"
 		)
 		batches = get_batch_allocations(row, required_qty, consumed_by_batch=consumed_by_batch)
 	
 	frappe.log_error(
-		f"[BATCH DEBUG] Creating bundle with batches: {batches}\n"
-		f"  Total qty in batches: {sum(flt(q) for q in batches.values())}",
-		title="Creating Bundle"
+		title="Creating Bundle",
+		message=f"[BATCH DEBUG] Creating bundle with batches: {batches}\n"
+			f"  Total qty in batches: {sum(flt(q) for q in batches.values())}"
 	)
 	
 	bundle = CustomSerialBatchCreation(
@@ -273,13 +273,13 @@ def make_auto_batch_bundle(doc, row, required_qty, consumed_by_batch=None):
 	
 	if bundle and bundle.get("name"):
 		frappe.log_error(
-			f"[BATCH DEBUG] Bundle created successfully: {bundle.name}",
-			title="Bundle Success"
+			title="Bundle Success",
+			message=f"[BATCH DEBUG] Bundle created successfully: {bundle.name}"
 		)
 	else:
 		frappe.log_error(
-			f"[BATCH DEBUG] Bundle creation returned None or no name",
-			title="Bundle Creation Failed"
+			title="Bundle Creation Failed",
+			message="[BATCH DEBUG] Bundle creation returned None or no name"
 		)
 
 	return (bundle, batches) if bundle and bundle.get("name") else (None, batches)
