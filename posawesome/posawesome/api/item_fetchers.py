@@ -772,7 +772,8 @@ def get_live_batch_qty(item_code: str, warehouse: str):
     
     # Use ERPNext's get_batch_qty which handles reserved stock correctly
     # This returns the same values that ERPNext's validation will check
-    batches = get_batch_qty(item_code=item_code, warehouse=warehouse)
+    # CRITICAL: for_stock_levels=True is required to get accurate batch quantities
+    batches = get_batch_qty(item_code=item_code, warehouse=warehouse, for_stock_levels=True)
     
     if not batches:
         return []

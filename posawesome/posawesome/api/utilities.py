@@ -154,10 +154,13 @@ def _get_live_batches_for_item(item_code, warehouse):
     - Same logic as ERPNext's validation
 
     This ensures backend allocation matches what ERPNext will validate on submission.
+    
+    CRITICAL: for_stock_levels=True is required to get accurate batch quantities.
+    Without it, ERPNext returns incomplete stock levels (e.g., 20 instead of 56).
     """
     from erpnext.stock.doctype.batch.batch import get_batch_qty
 
-    batches = get_batch_qty(item_code=item_code, warehouse=warehouse)
+    batches = get_batch_qty(item_code=item_code, warehouse=warehouse, for_stock_levels=True)
 
     if not batches:
         return []
