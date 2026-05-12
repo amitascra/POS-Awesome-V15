@@ -385,6 +385,8 @@ const performBatchSplit = (item: any, newQty: number) => {
 		price_list_rate: item.price_list_rate,
 		rate: item.rate,
 		discount_percentage: item.discount_percentage,
+		// CRITICAL: Include batch_no_data to enable auto-split
+		batch_no_data: item.batch_no_data,
 	};
 	
 	console.log('[ItemsTable] performBatchSplit itemToReAdd', {
