@@ -417,33 +417,23 @@ const handleQtyUpdate = (item: any, newQty: any) => {
 		auto_set_batch: props.pos_profile?.posa_auto_set_batch,
 	});
 	
-	// For batched items: if new qty exceeds current batch availability,
-	// auto-split without confirmation (frontend-first validation handles this)
+	// For batched items with auto-batch enabled: always trigger batch split
+	// This allows the addItem logic to handle batch allocation properly
 	if (
 		item?.has_batch_no &&
-		item?.batch_no &&
 		!props.isReturnInvoice &&
 		props.pos_profile?.posa_auto_set_batch
 	) {
 		const parsedQty = parseFloat(newQty) || 0;
-		const batchAvail = Number(item.actual_batch_qty) || 0;
 		
-		console.log('[ItemsTable] handleQtyUpdate batch check', {
-			parsedQty,
-			batchAvail,
-			exceeds: parsedQty > batchAvail,
-			will_split: parsedQty > batchAvail && batchAvail > 0,
-		});
-		
-		if (parsedQty > batchAvail && batchAvail > 0) {
-			console.log('[ItemsTable] handleQtyUpdate TRIGGERING performBatchSplit');
-			// Auto-split: remove item and re-add with new qty
-			performBatchSplit(item, parsedQty);
-			return;
-		}
+		console.log('[ItemsTable] handleQtyUpdate: batched item detected, triggering split');
+		// Always use performBatchSplit for batched items
+		// The addItem logic will handle single vs multi-batch allocation
+		performBatchSplit(item, parsedQty);
+		return;
 	}
 	
-	console.log('[ItemsTable] handleQtyUpdate using setFormatedQty (no split needed)');
+	console.log('[ItemsTable] handleQtyUpdate using setFormatedQty (no batch handling needed)');
 	props.setFormatedQty(item, "qty", null, false, newQty);
 	eventBus?.emit("recalculate_return_discount", { defer: true });
 };
