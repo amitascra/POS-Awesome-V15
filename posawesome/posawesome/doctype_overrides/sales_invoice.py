@@ -85,12 +85,8 @@ class CustomSalesInvoice(SalesInvoice):
 			key = (row.get("item_code"), row.get("warehouse"), batch_no)
 			already = flt(consumed_in_doc.get(key, 0))
 
-			selected_batch_qty = max(0.0, get_selected_batch_qty(row) - already)
 			required_qty = flt(row.stock_qty or row.qty)
-			if selected_batch_qty >= required_qty:
-				consumed_in_doc[key] = already + required_qty
-				continue
-
+			# Always create bundle for rows with batch_no to preserve frontend assignments
 			consumed_for_row_item_wh = {
 				bn: qty
 				for (ic, wh, bn), qty in consumed_in_doc.items()
