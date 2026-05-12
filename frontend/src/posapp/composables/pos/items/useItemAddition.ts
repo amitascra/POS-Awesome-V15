@@ -397,6 +397,14 @@ export function useItemAddition() {
 					item.to_set_serial_no = null;
 				}
 				
+				console.log('[useItemAddition] addItem BATCH LOGIC START', {
+					item_code: new_item.item_code,
+					qty: new_item.qty,
+					has_batch_no: new_item.has_batch_no,
+					batch_no: new_item.batch_no,
+					to_set_batch_no: item.to_set_batch_no,
+				});
+				
 				const extra_items: any[] = [];
 				const requestedQtyForBatching = Math.abs(
 					Number(new_item.qty || 0),
@@ -406,12 +414,22 @@ export function useItemAddition() {
 				// This prevents unnecessary backend calls and provides instant feedback
 				let shouldAllocateAcrossBatches = false;
 				
+				const autoSetBatchEnabled = shouldAutoSetBatch(context, new_item);
+				console.log('[useItemAddition] Auto-split conditions check', {
+					has_batch_no: new_item.has_batch_no,
+					batch_no_is_null: !new_item.batch_no,
+					to_set_batch_no_is_null: !item.to_set_batch_no,
+					autoSetBatchEnabled: autoSetBatchEnabled,
+					all_conditions_met: new_item.has_batch_no && !new_item.batch_no && !item.to_set_batch_no && autoSetBatchEnabled,
+				});
+				
 				if (
 					new_item.has_batch_no &&
 					!new_item.batch_no &&
 					!item.to_set_batch_no && // Don't split if user manually selected a batch
-					shouldAutoSetBatch(context, new_item)
+					autoSetBatchEnabled
 				) {
+					console.log('[useItemAddition] ENTERING auto-split logic block');
 					// Get batch availability (uses cached data - no API call)
 					const batches = await getBatchAvailabilityForItem(context, new_item);
 					const usable_batches = batches.filter((b) => b.available_qty > 0);
@@ -451,20 +469,33 @@ export function useItemAddition() {
 					
 					if (usable_batches.length > 0) {
 						const first_batch_qty = usable_batches[0]?.available_qty || 0;
+						console.log('[useItemAddition] Checking if split needed', {
+							requested: requestedQtyForBatching,
+							first_batch_qty: first_batch_qty,
+							exceeds: requestedQtyForBatching > first_batch_qty,
+						});
 						// Auto-split if requested qty exceeds first batch availability
 						if (requestedQtyForBatching > first_batch_qty) {
 							shouldAllocateAcrossBatches = true;
+							console.log('[useItemAddition] ✓ WILL AUTO-SPLIT across batches');
 							logBatchFlow("Auto-splitting triggered: qty exceeds single batch availability", {
 								item_code: new_item.item_code,
 								requested_qty: requestedQtyForBatching,
 								first_batch_qty: first_batch_qty,
 								total_available: totalAvailable,
 							});
+						} else {
+							console.log('[useItemAddition] ✗ No split needed - qty fits in first batch');
 						}
 					}
+				} else {
+					console.log('[useItemAddition] SKIPPING auto-split logic - conditions not met');
 				}
 
+				console.log('[useItemAddition] shouldAllocateAcrossBatches =', shouldAllocateAcrossBatches);
+				
 				if (shouldAllocateAcrossBatches) {
+					console.log('[useItemAddition] ========== STARTING BATCH SPLIT ==========');
 					// Get sorted availability (taking existing cart items into account)
 					const batches = await getBatchAvailabilityForItem(
 						context,
@@ -498,7 +529,12 @@ export function useItemAddition() {
 							});
 							remaining_qty -= take;
 						}
-						logBatchFlow("Batch allocation prepared", {
+						console.log('[useItemAddition] Batch allocations prepared', {
+							allocation_count: allocations.length,
+							allocations: allocations.map(a => ({ batch: a.batch, qty: a.qty })),
+						});
+
+						logBatchFlow("Batch allocations prepared", {
 							item_code: new_item.item_code,
 							requested_qty: new_item.qty,
 							allocations,
@@ -508,6 +544,7 @@ export function useItemAddition() {
 						// If we still have remainder but ran out of batches, add it to the last allocation
 						if (remaining_qty > 0) {
 							if (allocations.length > 0) {
+								console.log('[useItemAddition] Fetching batch availability for splitting...');
 								const lastAllocation =
 									allocations[allocations.length - 1];
 								if (lastAllocation) {

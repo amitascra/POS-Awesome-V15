@@ -341,6 +341,14 @@ const { addItem, removeItem: removeItemFromStore } = useItemAddition();
 
 
 const performBatchSplit = (item: any, newQty: number) => {
+	console.log('[ItemsTable] performBatchSplit CALLED', {
+		item_code: item.item_code,
+		old_qty: item.qty,
+		new_qty: newQty,
+		old_batch: item.batch_no,
+		has_batch_no: item.has_batch_no,
+	});
+	
 	const context = {
 		invoiceStore,
 		items: invoiceStore.items,
@@ -352,6 +360,13 @@ const performBatchSplit = (item: any, newQty: number) => {
 		new_line: true, // prevent merging with existing rows
 		warehouse: item.warehouse || props.pos_profile?.warehouse,
 	};
+	
+	console.log('[ItemsTable] performBatchSplit context', {
+		has_pos_profile: !!context.pos_profile,
+		warehouse: context.warehouse,
+		auto_set_batch: props.pos_profile?.posa_auto_set_batch,
+	});
+	
 	// Create a clean item object without batch data to trigger auto-split
 	const itemToReAdd = {
 		item_code: item.item_code,
@@ -371,12 +386,37 @@ const performBatchSplit = (item: any, newQty: number) => {
 		rate: item.rate,
 		discount_percentage: item.discount_percentage,
 	};
+	
+	console.log('[ItemsTable] performBatchSplit itemToReAdd', {
+		item_code: itemToReAdd.item_code,
+		qty: itemToReAdd.qty,
+		batch_no: itemToReAdd.batch_no,
+		has_batch_no: itemToReAdd.has_batch_no,
+		warehouse: itemToReAdd.warehouse,
+	});
+	
+	console.log('[ItemsTable] performBatchSplit REMOVING old item');
 	props.removeItem(item);
+	
+	console.log('[ItemsTable] performBatchSplit CALLING addItem');
 	addItem(itemToReAdd, context);
+	
 	eventBus?.emit("recalculate_return_discount", { defer: true });
+	console.log('[ItemsTable] performBatchSplit COMPLETE');
 };
 
 const handleQtyUpdate = (item: any, newQty: any) => {
+	console.log('[ItemsTable] handleQtyUpdate CALLED', {
+		item_code: item.item_code,
+		old_qty: item.qty,
+		new_qty: newQty,
+		has_batch_no: item?.has_batch_no,
+		batch_no: item?.batch_no,
+		actual_batch_qty: item?.actual_batch_qty,
+		is_return: props.isReturnInvoice,
+		auto_set_batch: props.pos_profile?.posa_auto_set_batch,
+	});
+	
 	// For batched items: if new qty exceeds current batch availability,
 	// auto-split without confirmation (frontend-first validation handles this)
 	if (
@@ -387,12 +427,23 @@ const handleQtyUpdate = (item: any, newQty: any) => {
 	) {
 		const parsedQty = parseFloat(newQty) || 0;
 		const batchAvail = Number(item.actual_batch_qty) || 0;
+		
+		console.log('[ItemsTable] handleQtyUpdate batch check', {
+			parsedQty,
+			batchAvail,
+			exceeds: parsedQty > batchAvail,
+			will_split: parsedQty > batchAvail && batchAvail > 0,
+		});
+		
 		if (parsedQty > batchAvail && batchAvail > 0) {
+			console.log('[ItemsTable] handleQtyUpdate TRIGGERING performBatchSplit');
 			// Auto-split: remove item and re-add with new qty
 			performBatchSplit(item, parsedQty);
 			return;
 		}
 	}
+	
+	console.log('[ItemsTable] handleQtyUpdate using setFormatedQty (no split needed)');
 	props.setFormatedQty(item, "qty", null, false, newQty);
 	eventBus?.emit("recalculate_return_discount", { defer: true });
 };
