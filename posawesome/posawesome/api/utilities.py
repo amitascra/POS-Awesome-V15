@@ -194,7 +194,41 @@ def set_batch_nos_for_bundels(doc, warehouse_field, throw=False):
     demand across all rows can exceed live stock, causing BatchNegativeStockError.
     We pre-compute total demand per (item, warehouse, batch) and reallocate all
     rows for any batch that is over-committed.
+    
+    CRITICAL: If frontend has already split an item across multiple batches,
+    skip reallocation entirely. The backend should only reallocate if frontend
+    sent a single row with insufficient batch qty.
     """
+    # ------------------------------------------------------------------
+    # Phase 0: Check if frontend has already done batch splitting
+    # ------------------------------------------------------------------
+    # Group items by (item_code, warehouse) and count unique batches per group
+    item_warehouse_batches = {}
+    for d in doc.items:
+        qty = flt(d.get("qty") or 0)
+        warehouse = d.get(warehouse_field) or ""
+        if not (warehouse and qty > 0 and d.get("batch_no")):
+            continue
+        has_batch_no = frappe.db.get_value("Item", d.item_code, "has_batch_no")
+        if not has_batch_no:
+            continue
+        
+        key = (d.item_code, warehouse)
+        if key not in item_warehouse_batches:
+            item_warehouse_batches[key] = set()
+        item_warehouse_batches[key].add(d.get("batch_no"))
+    
+    # If any item has multiple batches assigned, skip reallocation
+    # (frontend has already split, respect that)
+    has_frontend_splits = any(len(batches) > 1 for batches in item_warehouse_batches.values())
+    if has_frontend_splits:
+        frappe.log_error(
+            title="Frontend Batch Split Detected",
+            message=f"[BATCH DEBUG] Frontend has split batches across multiple rows. "
+                    f"Skipping backend reallocation to respect frontend assignments."
+        )
+        return
+    
     # ------------------------------------------------------------------
     # Phase 1: tally demand per (item_code, warehouse, batch_no)
     # ------------------------------------------------------------------
@@ -236,11 +270,9 @@ def set_batch_nos_for_bundels(doc, warehouse_field, throw=False):
 
         # Over-allocated (or stale): reallocate ALL rows for this item+warehouse
         # across all live batches in FEFO order.
-        # BUT: Only reallocate if the frontend explicitly split across multiple batches.
-        # If frontend assigned a single batch to a row, respect that assignment.
         reallocated.add(item_wh_key)
         
-        # Check if frontend has split this item across multiple batches
+        # Get all rows for this item/warehouse
         all_rows_for_item = [
             r for r in doc.items
             if r.item_code == item_code
@@ -248,20 +280,6 @@ def set_batch_nos_for_bundels(doc, warehouse_field, throw=False):
             and flt(r.get("qty") or 0) > 0
             and r.get("batch_no")
         ]
-        
-        # Count unique batches assigned by frontend
-        frontend_batches = set(r.get("batch_no") for r in all_rows_for_item if r.get("batch_no"))
-        
-        # If frontend only assigned ONE batch to this item/warehouse, do NOT reallocate
-        # Respect the frontend's explicit batch choice
-        if len(frontend_batches) == 1:
-            frappe.log_error(
-                title="Batch Reallocation Skipped",
-                message=f"[BATCH DEBUG] Skipping reallocation for {item_code} in {warehouse}: "
-                        f"Frontend assigned single batch {batch_no}. Respecting frontend choice."
-            )
-            reallocated.discard(item_wh_key)
-            continue
 
         total_demand = sum(flt(r.get("qty") or 0) for r in all_rows_for_item)
 
