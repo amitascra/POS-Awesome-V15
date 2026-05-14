@@ -199,6 +199,10 @@ def set_batch_nos_for_bundels(doc, warehouse_field, throw=False):
     handles batch splitting in before_validate(), so this function is not called for SI.
     This function is still used for other doctypes like POS Invoice.
     """
+    # Skip for Sales Invoice - CustomSalesInvoice handles batch allocation
+    if doc.doctype == "Sales Invoice":
+        return
+    
     # ------------------------------------------------------------------
     # Phase 1: tally demand per (item_code, warehouse, batch_no)
     # ------------------------------------------------------------------

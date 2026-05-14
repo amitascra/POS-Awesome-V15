@@ -828,6 +828,14 @@ def update_invoice(data):
 
     # Reapply any custom item names after defaults are set
     _apply_item_name_overrides(invoice_doc, overrides)
+    
+    # CRITICAL: When frontend sends batch_no (from batch splits), ensure use_serial_batch_fields=1
+    # This tells ERPNext to use batch_no field directly, not create bundles via dialog
+    for item in invoice_doc.items:
+        if item.get("batch_no") and item.get("item_code"):
+            has_batch = frappe.db.get_value("Item", item.item_code, "has_batch_no")
+            if has_batch:
+                item.use_serial_batch_fields = 1
 
     # Remove duplicate taxes from item and profile templates
     _merge_duplicate_taxes(invoice_doc)
